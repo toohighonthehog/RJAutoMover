@@ -1,0 +1,194 @@
+<Window x:Class="RJAutoMoverConfig.Windows.FileRuleEditorDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:converters="clr-namespace:RJAutoMoverConfig.Converters"
+        Title="Edit File Rule"
+        Height="700" Width="650"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#F5F5F5"
+        ShowInTaskbar="False">
+
+    <Window.Resources>
+        <converters:BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{DynamicResource HeaderGradient}" Padding="20,15">
+            <TextBlock Text="File Rule Editor" FontSize="18" FontWeight="Bold" Foreground="White"/>
+        </Border>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="20">
+                <!-- Rule Name -->
+                <TextBlock Text="Rule Name" Style="{DynamicResource LabelStyle}"/>
+                <TextBox x:Name="RuleNameTextBox" Style="{DynamicResource TextBoxStyle}"
+                         Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                         MaxLength="32"/>
+                <TextBlock Text="Alphanumeric and spaces only, max 32 characters"
+                           FontSize="10" Foreground="#999" Margin="0,2,0,10"/>
+
+                <!-- Source Folder -->
+                <TextBlock Text="Source Folder" Style="{DynamicResource LabelStyle}"/>
+                <Grid Margin="0,5,0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="SourceFolderTextBox" Grid.Column="0" Style="{DynamicResource TextBoxStyle}"
+                             Text="{Binding SourceFolder, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0"/>
+                    <Button Grid.Column="1" Content="Browse" Padding="10,5" Margin="5,5,5,5"
+                            Click="BrowseSourceFolder_Click"/>
+                    <Button Grid.Column="2" Content="▼" Padding="8,5" Margin="0,5"
+                            Click="ShowSourceVariables_Click" ToolTip="Special variables"/>
+                </Grid>
+                <TextBlock x:Name="SourceFolderStatus" FontSize="10" Margin="0,2,0,10"/>
+
+                <!-- Destination Folder -->
+                <TextBlock Text="Destination Folder" Style="{DynamicResource LabelStyle}"/>
+                <Grid Margin="0,5,0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="DestinationFolderTextBox" Grid.Column="0" Style="{DynamicResource TextBoxStyle}"
+                             Text="{Binding DestinationFolder, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0"/>
+                    <Button Grid.Column="1" Content="Browse" Padding="10,5" Margin="5,5,5,5"
+                            Click="BrowseDestinationFolder_Click"/>
+                    <Button Grid.Column="2" Content="▼" Padding="8,5" Margin="0,5"
+                            Click="ShowDestVariables_Click" ToolTip="Special variables"/>
+                </Grid>
+                <TextBlock x:Name="DestinationFolderStatus" FontSize="10" Margin="0,2,0,10"/>
+
+                <!-- Extensions -->
+                <TextBlock Text="File Extensions" Style="{DynamicResource LabelStyle}"/>
+                <TextBox x:Name="ExtensionTextBox" Style="{DynamicResource TextBoxStyle}"
+                         Text="{Binding Extension, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock FontSize="10" Foreground="#999" Margin="0,2,0,5" TextWrapping="Wrap">
+                    <Run Text="Use | to separate multiple extensions (e.g., .pdf|.doc|.txt)"/>
+                    <LineBreak/>
+                    <Run Text="Use 'OTHERS' to match any file type (requires date filter)"/>
+                </TextBlock>
+
+                <!-- Scan Interval -->
+                <TextBlock Text="Scan Interval (milliseconds)" Style="{DynamicResource LabelStyle}"/>
+                <Grid Margin="0,5,0,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="ScanIntervalTextBox" Grid.Column="0" Width="100"
+                             Text="{Binding ScanIntervalMs, UpdateSourceTrigger=PropertyChanged}"
+                             VerticalContentAlignment="Center" Padding="5" Margin="0"/>
+                    <Slider x:Name="ScanIntervalSlider" Grid.Column="1"
+                            Minimum="5000" Maximum="900000"
+                            Value="{Binding ScanIntervalMs, UpdateSourceTrigger=PropertyChanged}"
+                            TickFrequency="5000" IsSnapToTickEnabled="True"
+                            Margin="15,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="ScanIntervalLabel" Grid.Column="2"
+                               VerticalAlignment="Center" FontSize="11" Foreground="#666"/>
+                </Grid>
+                <TextBlock Text="Range: 5000-900000 ms (5 seconds to 15 minutes)"
+                           FontSize="10" Foreground="#999" Margin="0,2,0,10"/>
+
+                <!-- File Exists Action -->
+                <TextBlock Text="Action if File Exists in Destination" Style="{DynamicResource LabelStyle}"/>
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,10">
+                    <RadioButton x:Name="FileExistsSkipRadio" Content="Skip (leave existing file)"
+                                 GroupName="FileExists" Margin="0,0,20,0"
+                                 IsChecked="{Binding FileExistsSkip}"/>
+                    <RadioButton x:Name="FileExistsOverwriteRadio" Content="Overwrite (replace existing)"
+                                 GroupName="FileExists"
+                                 IsChecked="{Binding FileExistsOverwrite}"/>
+                </StackPanel>
+
+                <!-- Date Filtering -->
+                <TextBlock Text="Date Filtering (Optional)" Style="{DynamicResource SectionHeaderStyle}"/>
+                <TextBlock FontSize="11" Foreground="#666" Margin="0,0,0,10" TextWrapping="Wrap">
+                    Only ONE date filter allowed per rule. Leave all unchecked for no date filtering.
+                </TextBlock>
+
+                <RadioButton x:Name="NoDateFilterRadio" Content="No date filter" GroupName="DateFilter"
+                             Margin="0,5" IsChecked="True"
+                             Checked="DateFilterRadio_Changed"/>
+
+                <!-- Last Accessed Filter -->
+                <RadioButton x:Name="LastAccessedRadio" Content="Last Accessed:" GroupName="DateFilter"
+                             Margin="0,5" Checked="DateFilterRadio_Changed"/>
+                <StackPanel Orientation="Horizontal" Margin="25,5,0,5"
+                            IsEnabled="{Binding IsChecked, ElementName=LastAccessedRadio}">
+                    <RadioButton x:Name="LastAccessedOlderRadio" Content="Older than" GroupName="LastAccessedDir"
+                                 Margin="0,0,10,0" IsChecked="True"/>
+                    <RadioButton x:Name="LastAccessedWithinRadio" Content="Within last" GroupName="LastAccessedDir"
+                                 Margin="0,0,10,0"/>
+                    <TextBox x:Name="LastAccessedMinsTextBox" Width="100" Padding="5"
+                             VerticalContentAlignment="Center"/>
+                    <TextBlock Text="minutes" VerticalAlignment="Center" Margin="10,0"/>
+                </StackPanel>
+
+                <!-- Last Modified Filter -->
+                <RadioButton x:Name="LastModifiedRadio" Content="Last Modified:" GroupName="DateFilter"
+                             Margin="0,5" Checked="DateFilterRadio_Changed"/>
+                <StackPanel Orientation="Horizontal" Margin="25,5,0,5"
+                            IsEnabled="{Binding IsChecked, ElementName=LastModifiedRadio}">
+                    <RadioButton x:Name="LastModifiedOlderRadio" Content="Older than" GroupName="LastModifiedDir"
+                                 Margin="0,0,10,0" IsChecked="True"/>
+                    <RadioButton x:Name="LastModifiedWithinRadio" Content="Within last" GroupName="LastModifiedDir"
+                                 Margin="0,0,10,0"/>
+                    <TextBox x:Name="LastModifiedMinsTextBox" Width="100" Padding="5"
+                             VerticalContentAlignment="Center"/>
+                    <TextBlock Text="minutes" VerticalAlignment="Center" Margin="10,0"/>
+                </StackPanel>
+
+                <!-- Age Created Filter -->
+                <RadioButton x:Name="AgeCreatedRadio" Content="Age (Created):" GroupName="DateFilter"
+                             Margin="0,5" Checked="DateFilterRadio_Changed"/>
+                <StackPanel Orientation="Horizontal" Margin="25,5,0,10"
+                            IsEnabled="{Binding IsChecked, ElementName=AgeCreatedRadio}">
+                    <RadioButton x:Name="AgeCreatedOlderRadio" Content="Older than" GroupName="AgeCreatedDir"
+                                 Margin="0,0,10,0" IsChecked="True"/>
+                    <RadioButton x:Name="AgeCreatedWithinRadio" Content="Within last" GroupName="AgeCreatedDir"
+                                 Margin="0,0,10,0"/>
+                    <TextBox x:Name="AgeCreatedMinsTextBox" Width="100" Padding="5"
+                             VerticalContentAlignment="Center"/>
+                    <TextBlock Text="minutes" VerticalAlignment="Center" Margin="10,0"/>
+                </StackPanel>
+
+                <TextBlock FontSize="10" Foreground="#999" Margin="0,0,0,10" TextWrapping="Wrap">
+                    <Run Text="Common values: 60 (1 hr), 1440 (1 day), 10080 (7 days), 43200 (30 days)"/>
+                    <LineBreak/>
+                    <Run Text="Range: 1-5256000 minutes (1 min to 10 years)"/>
+                    <LineBreak/>
+                    <Run Text="Note: OTHERS extension rules MUST have a date filter"/>
+                </TextBlock>
+
+                <!-- Rule Active -->
+                <CheckBox x:Name="IsActiveCheckBox" Content="Rule is Active" FontWeight="Bold" FontSize="13"
+                          IsChecked="{Binding IsActive}" Margin="0,10,0,0"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons -->
+        <Border Grid.Row="2" Background="White" Padding="15" BorderBrush="#DDDDDD" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Save" Style="{DynamicResource ButtonStyle}"
+                        Click="SaveButton_Click" Padding="20,8" MinWidth="100"/>
+                <Button Content="Cancel" Style="{DynamicResource ButtonStyle}"
+                        Click="CancelButton_Click" Padding="20,8" MinWidth="100" Background="#999999"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

@@ -1,0 +1,160 @@
+syntax = "proto3";
+
+option csharp_namespace = "RJAutoMoverShared.Protos";
+
+package communication;
+
+// Service provided by the service application (tray connects as client)
+service TrayService {
+  rpc RegisterTray (RegisterRequest) returns (RegisterResponse);
+  rpc HeartbeatTray (HeartbeatRequest) returns (HeartbeatResponse);
+  rpc ToggleProcessing (ToggleProcessingRequest) returns (ToggleProcessingResponse);
+  rpc GetServiceStatus (Empty) returns (ServiceStatusResponse);
+  rpc StreamUpdates (Empty) returns (stream ServiceUpdate);
+  rpc ClearRecentActivities (Empty) returns (ClearRecentActivitiesResponse);
+  rpc GetServiceSystemInfo (Empty) returns (ServiceSystemInfoResponse);
+}
+
+// Service provided by the tray application (service connects as client)
+service ServiceClient {
+  rpc RequestFileCopyPermission (FileCopyRequest) returns (FileCopyResponse);
+  rpc NotifyFileTransfer (FileTransferNotification) returns (Empty);
+  rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message Empty {}
+
+message RegisterRequest {
+  string trayId = 1;
+  string username = 2;
+  int32 windowsSessionId = 3;
+  bool forceRegister = 4;
+  bool isAdministrator = 5;
+  int32 processId = 6;
+}
+
+message RegisterResponse {
+  bool success = 1;
+  string message = 2;
+  string logFolder = 3;
+  string conflictingUser = 4;
+  int64 serviceStartTime = 5;
+}
+
+message HeartbeatRequest {
+  string trayId = 1;
+  int64 timestamp = 2;
+}
+
+message HeartbeatResponse {
+  bool acknowledged = 1;
+  bool isActiveTray = 2;
+  string activeUser = 3;
+}
+
+message StatusUpdate {
+  string status = 1;
+  int64 timestamp = 2;
+}
+
+message IconUpdate {
+  string iconName = 1;
+  int64 timestamp = 2;
+}
+
+message RecentsUpdate {
+  repeated string recentItems = 1;
+  int64 timestamp = 2;
+}
+
+message ToggleProcessingRequest {
+  bool pauseProcessing = 1;
+}
+
+message ToggleProcessingResponse {
+  bool success = 1;
+  bool currentStatus = 2;
+}
+
+message ServiceStatusResponse {
+  bool isRunning = 1;
+  bool isPaused = 2;
+  string currentStatus = 3;
+  repeated string recentItems = 4;
+  string currentIcon = 5;
+  int32 fileCount = 6;
+  int64 serviceStartTime = 7;
+}
+
+message ServiceUpdate {
+  oneof update {
+    StatusUpdate status = 1;
+    IconUpdate icon = 2;
+    RecentsUpdate recents = 3;
+    FileCountUpdate fileCount = 4;
+    FileTransferNotification fileTransfer = 5;
+    ServiceStartTimeUpdate serviceStartTime = 6;
+  }
+}
+
+message ServiceStartTimeUpdate {
+  int64 startTimeUnixMs = 1;
+}
+
+message FileCountUpdate {
+  int32 count = 1;
+  int64 timestamp = 2;
+}
+
+message FileCopyRequest {
+  string fileName = 1;
+  string sourceFolder = 2;
+  string destinationFolder = 3;
+  string ruleName = 4;
+  int64 fileSizeBytes = 5;
+}
+
+message FileCopyResponse {
+  bool allowCopy = 1;
+  string message = 2;
+}
+
+message FileTransferNotification {
+  string fileName = 1;
+  string ruleName = 2;
+  int64 fileSizeBytes = 3;
+  TransferStatus status = 4;
+  string message = 5;
+  int64 timestamp = 6;
+}
+
+enum TransferStatus {
+  TRANSFER_STARTED = 0;
+  TRANSFER_COMPLETED = 1;
+  TRANSFER_FAILED = 2;
+}
+
+message HealthCheckRequest {
+  int64 timestamp = 1;
+  string serviceVersion = 2;
+  int64 uptimeMs = 3;
+  int64 memoryUsageMB = 4;
+}
+
+message HealthCheckResponse {
+  bool isHealthy = 1;
+  string trayVersion = 2;
+  int64 responseTimestamp = 3;
+}
+
+message ClearRecentActivitiesResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ServiceSystemInfoResponse {
+  int64 memoryUsageBytes = 1;
+  int64 peakMemoryUsageBytes = 2;
+  int64 startTimeUnixMs = 3;
+  int64 uptimeMs = 4;
+}

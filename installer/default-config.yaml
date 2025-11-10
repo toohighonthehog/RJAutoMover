@@ -1,0 +1,306 @@
+# ==============================================================================
+# RJAutoMover Configuration File
+# ==============================================================================
+# This file controls how RJAutoMover monitors and moves files automatically.
+#
+# IMPORTANT: After editing this file, you MUST restart the RJAutoMoverService
+# for changes to take effect (Win+R -> services.msc -> Restart service)
+#
+# Documentation: See README.md or README.txt for detailed explanations
+# ==============================================================================
+
+# ==============================================================================
+# FILE RULES - Define what files to process and where to move them
+# ==============================================================================
+# Each rule monitors a source folder for specific file types and moves them
+# to a destination folder. You can have multiple rules with different settings.
+#
+# Required Fields:
+#   - Name: Friendly name for the rule (1-32 alphanumeric characters)
+#   - SourceFolder: Folder to monitor (must exist, service must have read access)
+#   - Extension: File extensions to match (e.g., .pdf or .doc|.docx|.pdf)
+#       Special: Use "ALL" to match ANY file type (catch-all rule)
+#       Note: ALL rules MUST have a date criteria and only one per source folder
+#   - DestinationFolder: Where to move files (must exist, service must have write access)
+#   - ScanIntervalMs: How often to scan in milliseconds (5000-900000, recommended: 30000)
+#   - IsActive: Enable/disable this rule (true or false)
+#   - FileExists: What to do if file exists in destination (skip or overwrite)
+#
+# Optional Date Criteria (mutually exclusive - only use ONE per rule):
+#   - LastAccessedMins: Filter files by last access time
+#       Range: -5256000 to +5256000 (+/- 10 years, zero not allowed)
+#       Positive = OLDER than X minutes (e.g., 1440 = files accessed MORE than 24 hours ago)
+#       Negative = WITHIN last X minutes (e.g., -60 = files accessed WITHIN last 60 minutes)
+#       Examples: 1440 (older than 24 hours), -60 (within last hour)
+#   - LastModifiedMins: Filter files by last modification time
+#       Range: -5256000 to +5256000 (+/- 10 years, zero not allowed)
+#       Positive = OLDER than X minutes (e.g., 60 = files modified MORE than 60 minutes ago)
+#       Negative = WITHIN last X minutes (e.g., -30 = files modified WITHIN last 30 minutes)
+#       Examples: 60 (older than 1 hour), -30 (within last 30 min)
+#   - AgeCreatedMins: Filter files by creation time
+#       Range: -5256000 to +5256000 (+/- 10 years, zero not allowed)
+#       Positive = OLDER than X minutes (e.g., 10080 = files created MORE than 7 days ago)
+#       Negative = WITHIN last X minutes (e.g., -1440 = files created WITHIN last 24 hours)
+#       Examples: 10080 (older than 7 days), -1440 (within last 24 hours)
+#   IMPORTANT: Only ONE date criteria can be used per rule. If multiple are specified,
+#              validation will fail with an error explaining the conflict.
+#
+# Special Variables:
+#   <InstallingUserDownloads> - Downloads folder of user who installed app
+#   <InstallingUserDocuments> - Documents folder of user who installed app
+#   <InstallingUserDesktop> - Desktop folder of user who installed app
+# ==============================================================================
+
+FileRules:
+  # Example Rule 1: Move video files from Downloads to a Temp subfolder
+  - Name: Movie Files Downloads
+    SourceFolder: <InstallingUserDownloads>
+    Extension: .mp4|.mov|.avi|.mkv
+    DestinationFolder: <InstallingUserDownloads>\Temp
+    ScanIntervalMs: 15000
+    IsActive: true
+    FileExists: skip
+
+  # Example Rule 2: Move document files from Downloads to a Temp subfolder
+  - Name: Document Files
+    SourceFolder: <InstallingUserDownloads>
+    Extension: .doc|.docx|.xls|.xlsx|.ppt|.pptx|.pdf|.txt|.rtf
+    DestinationFolder: <InstallingUserDownloads>\Temp
+    ScanIntervalMs: 5000
+    IsActive: true
+    FileExists: overwrite
+
+  # Example Rule 3: Move old log files (older than 7 days) to archive folder
+  # This demonstrates the AgeCreatedMins date criteria with POSITIVE value (older than)
+  # - Name: Archive Old Logs
+  #   SourceFolder: C:\Logs
+  #   Extension: .log|.txt
+  #   DestinationFolder: C:\Logs\Archive
+  #   ScanIntervalMs: 86400000
+  #   IsActive: false
+  #   FileExists: skip
+  #   AgeCreatedMins: 10080  # Positive = OLDER than 7 days (7 * 24 * 60 minutes)
+
+  # Example Rule 4: Catch-all rule using Extension: ALL
+  # This demonstrates an ALL extension rule (lowest priority - processes last)
+  # ALL rules act as a catch-all for any file type not matched by specific rules
+  # IMPORTANT: ALL rules MUST have a date criteria and only one per source folder
+  # - Name: Cleanup Old Downloads
+  #   SourceFolder: <InstallingUserDownloads>
+  #   Extension: ALL
+  #   DestinationFolder: <InstallingUserDownloads>\OldFiles
+  #   ScanIntervalMs: 3600000
+  #   IsActive: false
+  #   FileExists: skip
+  #   AgeCreatedMins: 43200  # Positive = OLDER than 30 days (30 * 24 * 60 minutes)
+
+# ==============================================================================
+# APPLICATION SETTINGS - Control service behavior
+# ==============================================================================
+# These settings control how the RJAutoMover service operates, including timing,
+# memory limits, logging, and communication ports.
+# ==============================================================================
+
+Application:
+  # --------------------------------------------------------------------------
+  # Processing Control
+  # --------------------------------------------------------------------------
+
+  # ProcessingPaused: Whether service starts in paused mode
+  # Default: false
+  # Values: true (start paused, must manually resume) or false (start active)
+  # Recommendation: Set to true for safety during initial setup
+  ProcessingPaused: false
+
+  # RequireTrayApproval: Whether service requires tray approval before moving files
+  # Default: false (autonomous operation)
+  # Values: true (legacy mode - requires tray approval) or false (autonomous)
+  # Note: When false, service moves files independently of tray connection
+  RequireTrayApproval: false
+
+  # --------------------------------------------------------------------------
+  # Timing and Retry Settings
+  # --------------------------------------------------------------------------
+
+  # RetryDelayMs: Delay before retrying failed file operations
+  # Default: 5000 (5 seconds)
+  # Range: 1000 - 30000 milliseconds (1-30 seconds)
+  # Purpose: Wait time between retry attempts for locked or inaccessible files
+  RetryDelayMs: 5000
+
+  # FailureCooldownMs: Cooldown period after repeated failures
+  # Default: 180000 (3 minutes)
+  # Range: 0 - 180000 milliseconds (0-3 minutes)
+  # Purpose: Ignore file temporarily after max retries to avoid resource waste
+  # Note: Set to 0 to disable cooldown (not recommended)
+  FailureCooldownMs: 180000
+
+  # RecheckServiceMs: Service health check interval
+  # Default: 30000 (30 seconds)
+  # Range: 5000 - 60000 milliseconds (5-60 seconds)
+  # Purpose: How often tray checks service connection status
+  RecheckServiceMs: 30000
+
+  # RecheckTrayMs: Tray health check interval
+  # Default: 30000 (30 seconds)
+  # Range: 5000 - 60000 milliseconds (5-60 seconds)
+  # Purpose: How often service checks tray connection status
+  RecheckTrayMs: 30000
+
+  # PauseDelayMs: Artificial delay when processing is paused
+  # Default: 1000 (1 second)
+  # Range: 0 - 60000 milliseconds (0-60 seconds)
+  # Purpose: Delay between file operations (use to throttle processing)
+  # Note: 0 = no delay (recommended for most cases)
+  PauseDelayMs: 1000
+
+  # ServiceHeartbeatMs: Service heartbeat/health check interval
+  # Default: 300000 (5 minutes)
+  # Range: 60000 - 3600000 milliseconds (1-60 minutes)
+  # Purpose: Service/tray bidirectional health monitoring frequency
+  ServiceHeartbeatMs: 300000
+
+  # --------------------------------------------------------------------------
+  # Memory Management
+  # --------------------------------------------------------------------------
+
+  # MemoryLimitMb: Memory usage threshold before entering error mode
+  # Default: 512 MB
+  # Range: 128 - 4096 MB
+  # Recommendations:
+  #   256 MB  = Constrained/old systems
+  #   512 MB  = Normal systems (recommended)
+  #   1024 MB = Busy systems with many rules or large files
+  # Note: Service enters error mode and stops processing if exceeded
+  MemoryLimitMb: 512
+
+  # MemoryCheckMs: Memory monitoring interval
+  # Default: 60000 (1 minute)
+  # Range: 30000 - 300000 milliseconds (30 seconds - 5 minutes)
+  # Purpose: How often to check and log memory usage
+  MemoryCheckMs: 60000
+
+  # --------------------------------------------------------------------------
+  # Logging Configuration
+  # --------------------------------------------------------------------------
+
+  # LogFolder: Custom folder for log files
+  # Default: C:\ProgramData\RJAutoMover\Logs (shared location for all users)
+  # Purpose: Centralized log storage accessible by service and all tray instances
+  # Notes:
+  #   - Folder is created automatically if it doesn't exist
+  #   - Service account must have write permissions
+  #   - Both service and tray logs are stored here
+  #   - Logs are rotated automatically when they reach 10MB
+  #   - Powered by Serilog for reliable, high-performance logging
+  LogFolder: C:\ProgramData\RJAutoMover\Logs
+
+  # LogRetentionDays: Number of days to retain log files before automatic cleanup
+  # Default: 7 days
+  # Range: 1 - 365 days
+  # Purpose: Automatic log cleanup on service/tray startup
+  # Note: Older log files are deleted to save disk space
+  LogRetentionDays: 7
+
+  # --------------------------------------------------------------------------
+  # Network Communication Ports (gRPC)
+  # --------------------------------------------------------------------------
+
+  # ServiceGrpcPort: TCP port for RJAutoMoverService gRPC server
+  # Default: 60051
+  # Range: 1024 - 65535 (user ports only)
+  # Purpose: Service listens on this port for tray connections
+  # Important: Must be different from TrayGrpcPort
+  # Note: Change only if port conflict occurs
+  ServiceGrpcPort: 60051
+
+  # TrayGrpcPort: TCP port for RJAutoMoverTray gRPC server
+  # Default: 60052
+  # Range: 1024 - 65535 (user ports only)
+  # Purpose: Tray listens on this port for service connections
+  # Important: Must be different from ServiceGrpcPort
+  # Note: Change only if port conflict occurs
+  TrayGrpcPort: 60052
+
+  # --------------------------------------------------------------------------
+  # Activity History Database
+  # --------------------------------------------------------------------------
+
+  # ActivityHistoryEnabled: Enable persistent activity history database
+  # Default: true
+  # Values: true (enable database tracking) or false (disable database)
+  # Purpose: SQLite database tracks all file transfers across sessions
+  # Location: C:\Program Files\RJAutoMover\Data\ActivityHistory.db
+  # Benefits:
+  #   - Complete transfer history viewable by all users
+  #   - Session tracking with unique session IDs
+  #   - Cross-user visibility of all file operations
+  #   - Accountability - service blocks transfers if database writes fail
+  ActivityHistoryEnabled: true
+
+  # ActivityHistoryMaxRecords: Maximum number of records to keep in database
+  # Default: 5000
+  # Range: 100 - 50000
+  # Purpose: Limit database size by keeping only most recent transfers
+  # Note: Oldest records are automatically deleted when limit is reached
+  ActivityHistoryMaxRecords: 5000
+
+  # ActivityHistoryRetentionDays: Automatically purge records older than this
+  # Default: 90 days
+  # Range: 1 - 365 days
+  # Purpose: Automatic cleanup of old transfer history
+  # Note: Purge runs on service startup
+  ActivityHistoryRetentionDays: 90
+
+# ==============================================================================
+# CONFIGURATION NOTES
+# ==============================================================================
+#
+# Validation Rules:
+#   - Service validates configuration on startup
+#   - Invalid configuration prevents service from starting
+#   - Check logs for detailed validation error messages
+#   - At least one rule must have valid source/destination paths
+#
+# Path Requirements:
+#   - All folders must exist before starting service
+#   - Service account must have appropriate read/write permissions
+#   - Network paths (UNC) are supported: \\server\share\folder
+#   - NO wildcards allowed in paths (* or ?)
+#
+# Extension Rules:
+#   - Must include leading dot (.pdf not pdf)
+#   - Use pipe symbol (|) for multiple extensions: .doc|.docx|.pdf
+#   - Case-insensitive matching (.PDF and .pdf both work)
+#   - NO wildcards allowed (* or ?)
+#   - Same source folder cannot have duplicate extensions across active rules
+#
+# Advanced Validations:
+#   - Infinite loop prevention (destination cannot be a source)
+#   - Circular chain detection (multi-hop loop detection)
+#   - Source and destination cannot be identical
+#   - Destination cannot be subdirectory of source (prevents recursive growth)
+#   - Reserved Windows folder names are blocked (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
+#
+# Best Practices:
+#   - Always backup this file before editing
+#   - Start with ProcessingPaused: true for safety during setup/testing
+#   - Test new rules with IsActive: false first, then enable when ready
+#   - Use descriptive rule names for easier troubleshooting
+#   - Start with longer scan intervals (30-60 seconds) and adjust as needed
+#   - Monitor logs after making changes to verify correct operation
+#   - Test network paths manually before adding to configuration
+#   - Use FileExists: skip unless you specifically need to overwrite files
+#
+# Service Restart Required:
+#   - All configuration changes require service restart to take effect
+#   - Win+R -> services.msc -> RJAutoMoverService -> Right-click -> Restart
+#   - Service automatically enters ERROR MODE if config is changed while running
+#
+# For More Information:
+#   - See README.md for comprehensive documentation
+#   - See README.txt for detailed explanations and examples
+#   - Check logs in C:\ProgramData\RJAutoMover\Logs for troubleshooting
+#   - Visit https://github.com/toohighonthehog/RJAutoMover for updates
+#
+# ==============================================================================

@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <!-- Read version from installer/version.txt -->
+  <PropertyGroup>
+    <AppVersion Condition="Exists('$(MSBuildProjectDirectory)\..\installer\version.txt')">$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\..\installer\version.txt').Trim())</AppVersion>
+    <AppVersion Condition="'$(AppVersion)' == ''">1.0.0.0</AppVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <ApplicationIcon>..\Icons\waiting.ico</ApplicationIcon>
+    <Version>$(AppVersion)</Version>
+    <AssemblyVersion>$(AppVersion)</AssemblyVersion>
+    <FileVersion>$(AppVersion)</FileVersion>
+    <AssemblyInformationalVersion>$(AppVersion)</AssemblyInformationalVersion>
+    <PublishSingleFile Condition="'$(SelfContained)' == 'true'">true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract Condition="'$(SelfContained)' == 'true'">true</IncludeNativeLibrariesForSelfExtract>
+    <RollForward>LatestPatch</RollForward>
+  </PropertyGroup>
+
+  <!-- Capture build-time information -->
+  <Target Name="AddBuildMetadata" BeforeTargets="GetAssemblyAttributes">
+    <PropertyGroup>
+      <InformationalVersion>$(Version)+sdk-$(NETCoreSdkVersion)+config-$(Configuration)+rid-$(RuntimeIdentifier)</InformationalVersion>
+    </PropertyGroup>
+  </Target>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>BuildSdkVersion</_Parameter1>
+      <_Parameter2>$(NETCoreSdkVersion)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>BuildConfiguration</_Parameter1>
+      <_Parameter2>$(Configuration)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>RuntimeIdentifier</_Parameter1>
+      <_Parameter2>$(RuntimeIdentifier)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>PackageVersions</_Parameter1>
+      <_Parameter2>Grpc.AspNetCore:2.71.0;Microsoft.Extensions.Hosting.WindowsServices:9.0.9;YamlDotNet:16.3.0</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore" Version="2.71.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.9" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RJAutoMoverShared\RJAutoMoverShared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\Icons\*.ico" />
+  </ItemGroup>
+
+</Project>
