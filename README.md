@@ -26,7 +26,7 @@ Simply run the installer with administrator privileges - it handles everything a
 RJAutoMover is a powerful file automation tool that watches specified folders and automatically moves files to designated locations based on customizable rules. Perfect for:
 
 - 📂 Organizing downloads automatically by file type.
-- 🎬 Managing media files (videos, images, music)
+- 🎬 Managing media files (videos, images, music).
 - 📄 Sorting documents as they arrive
 - 🔄 Automating repetitive file management tasks
 - 🗂️ Keeping workspaces clean and organized
