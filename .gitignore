@@ -41,7 +41,6 @@ artifacts/
 *.pidb
 *.svclog
 *.scc
-*.exe
 
 # NuGet Packages
 *.nupkg
@@ -93,7 +92,6 @@ config.yaml
 
 # Testing scripts with personal network paths
 Notes/Revert-TestFiles.ps1
-installer/RJAutoMoverSetup.exe 
 
 # AI assistant conversation files
 GEMINI.md
