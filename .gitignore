@@ -89,10 +89,3 @@ config.yaml
 
 # Claude Code IDE settings (contains local paths and development environment specifics)
 .claude/settings.local.json
-
-# Testing scripts with personal network paths
-Notes/Revert-TestFiles.ps1
-
-# AI assistant conversation files
-GEMINI.md
-

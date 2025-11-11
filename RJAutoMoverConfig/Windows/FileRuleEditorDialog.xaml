@@ -21,7 +21,7 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Background="{DynamicResource HeaderGradient}" Padding="20,15">
+        <Border Grid.Row="0" Background="{StaticResource HeaderGradient}" Padding="20,15">
             <TextBlock Text="File Rule Editor" FontSize="18" FontWeight="Bold" Foreground="White"/>
         </Border>
 
@@ -29,22 +29,22 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="20">
                 <!-- Rule Name -->
-                <TextBlock Text="Rule Name" Style="{DynamicResource LabelStyle}"/>
-                <TextBox x:Name="RuleNameTextBox" Style="{DynamicResource TextBoxStyle}"
+                <TextBlock Text="Rule Name" Style="{StaticResource LabelStyle}"/>
+                <TextBox x:Name="RuleNameTextBox" Style="{StaticResource TextBoxStyle}"
                          Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
                          MaxLength="32"/>
                 <TextBlock Text="Alphanumeric and spaces only, max 32 characters"
                            FontSize="10" Foreground="#999" Margin="0,2,0,10"/>
 
                 <!-- Source Folder -->
-                <TextBlock Text="Source Folder" Style="{DynamicResource LabelStyle}"/>
+                <TextBlock Text="Source Folder" Style="{StaticResource LabelStyle}"/>
                 <Grid Margin="0,5,0,5">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox x:Name="SourceFolderTextBox" Grid.Column="0" Style="{DynamicResource TextBoxStyle}"
+                    <TextBox x:Name="SourceFolderTextBox" Grid.Column="0" Style="{StaticResource TextBoxStyle}"
                              Text="{Binding SourceFolder, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0"/>
                     <Button Grid.Column="1" Content="Browse" Padding="10,5" Margin="5,5,5,5"
@@ -55,14 +55,14 @@
                 <TextBlock x:Name="SourceFolderStatus" FontSize="10" Margin="0,2,0,10"/>
 
                 <!-- Destination Folder -->
-                <TextBlock Text="Destination Folder" Style="{DynamicResource LabelStyle}"/>
+                <TextBlock Text="Destination Folder" Style="{StaticResource LabelStyle}"/>
                 <Grid Margin="0,5,0,5">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox x:Name="DestinationFolderTextBox" Grid.Column="0" Style="{DynamicResource TextBoxStyle}"
+                    <TextBox x:Name="DestinationFolderTextBox" Grid.Column="0" Style="{StaticResource TextBoxStyle}"
                              Text="{Binding DestinationFolder, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0"/>
                     <Button Grid.Column="1" Content="Browse" Padding="10,5" Margin="5,5,5,5"
@@ -73,8 +73,8 @@
                 <TextBlock x:Name="DestinationFolderStatus" FontSize="10" Margin="0,2,0,10"/>
 
                 <!-- Extensions -->
-                <TextBlock Text="File Extensions" Style="{DynamicResource LabelStyle}"/>
-                <TextBox x:Name="ExtensionTextBox" Style="{DynamicResource TextBoxStyle}"
+                <TextBlock Text="File Extensions" Style="{StaticResource LabelStyle}"/>
+                <TextBox x:Name="ExtensionTextBox" Style="{StaticResource TextBoxStyle}"
                          Text="{Binding Extension, UpdateSourceTrigger=PropertyChanged}"/>
                 <TextBlock FontSize="10" Foreground="#999" Margin="0,2,0,5" TextWrapping="Wrap">
                     <Run Text="Use | to separate multiple extensions (e.g., .pdf|.doc|.txt)"/>
@@ -83,7 +83,7 @@
                 </TextBlock>
 
                 <!-- Scan Interval -->
-                <TextBlock Text="Scan Interval (milliseconds)" Style="{DynamicResource LabelStyle}"/>
+                <TextBlock Text="Scan Interval (milliseconds)" Style="{StaticResource LabelStyle}"/>
                 <Grid Margin="0,5,0,5">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -105,7 +105,7 @@
                            FontSize="10" Foreground="#999" Margin="0,2,0,10"/>
 
                 <!-- File Exists Action -->
-                <TextBlock Text="Action if File Exists in Destination" Style="{DynamicResource LabelStyle}"/>
+                <TextBlock Text="Action if File Exists in Destination" Style="{StaticResource LabelStyle}"/>
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,10">
                     <RadioButton x:Name="FileExistsSkipRadio" Content="Skip (leave existing file)"
                                  GroupName="FileExists" Margin="0,0,20,0"
@@ -116,7 +116,7 @@
                 </StackPanel>
 
                 <!-- Date Filtering -->
-                <TextBlock Text="Date Filtering (Optional)" Style="{DynamicResource SectionHeaderStyle}"/>
+                <TextBlock Text="Date Filtering (Optional)" Style="{StaticResource SectionHeaderStyle}"/>
                 <TextBlock FontSize="11" Foreground="#666" Margin="0,0,0,10" TextWrapping="Wrap">
                     Only ONE date filter allowed per rule. Leave all unchecked for no date filtering.
                 </TextBlock>
@@ -184,9 +184,9 @@
         <!-- Buttons -->
         <Border Grid.Row="2" Background="White" Padding="15" BorderBrush="#DDDDDD" BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Save" Style="{DynamicResource ButtonStyle}"
+                <Button Content="Save" Style="{StaticResource ButtonStyle}"
                         Click="SaveButton_Click" Padding="20,8" MinWidth="100"/>
-                <Button Content="Cancel" Style="{DynamicResource ButtonStyle}"
+                <Button Content="Cancel" Style="{StaticResource ButtonStyle}"
                         Click="CancelButton_Click" Padding="20,8" MinWidth="100" Background="#999999"/>
             </StackPanel>
         </Border>

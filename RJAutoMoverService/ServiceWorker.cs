@@ -4,6 +4,7 @@ using RJAutoMoverS.Services;
 using RJAutoMoverShared.Models;
 using RJAutoMoverShared.Services;
 using LogLevel = RJAutoMoverShared.Models.LogLevel;
+using ValidationResult = RJAutoMoverS.Config.ValidationResult;
 
 namespace RJAutoMoverS;
 

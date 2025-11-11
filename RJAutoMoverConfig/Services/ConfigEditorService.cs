@@ -1,7 +1,6 @@
 using System.IO;
 using RJAutoMoverShared.Models;
 using RJAutoMoverShared.Helpers;
-using RJAutoMoverS.Config;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -13,13 +12,11 @@ namespace RJAutoMoverConfig.Services;
 public class ConfigEditorService
 {
     private readonly RJAutoMoverShared.Services.LoggingService _loggingService;
-    private readonly ConfigValidator _validator;
 
     public ConfigEditorService()
     {
         // Create a logging service for validation
         _loggingService = new RJAutoMoverShared.Services.LoggingService("ConfigEditor");
-        _validator = new ConfigValidator(_loggingService);
     }
 
     /// <summary>

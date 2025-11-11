@@ -56,7 +56,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RJAutoMoverShared\RJAutoMoverShared.csproj" />
-    <ProjectReference Include="..\RJAutoMoverService\RJAutoMoverService.csproj" />
   </ItemGroup>
 
   <ItemGroup>
