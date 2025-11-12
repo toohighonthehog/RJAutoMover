@@ -1,7 +1,6 @@
 <Window x:Class="RJAutoMoverConfig.Windows.FileRuleEditorDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:converters="clr-namespace:RJAutoMoverConfig.Converters"
         Title="Edit File Rule"
         Height="700" Width="650"
         WindowStartupLocation="CenterOwner"
@@ -10,7 +9,7 @@
         ShowInTaskbar="False">
 
     <Window.Resources>
-        <converters:BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <!-- Resources go here -->
     </Window.Resources>
 
     <Grid>

@@ -1,3 +1,5 @@
+using YamlDotNet.Serialization;
+
 namespace RJAutoMoverShared.Models;
 
 public class FileRule
@@ -51,16 +53,19 @@ public class FileRule
     /// <summary>
     /// Helper property for displaying file exists action in UI
     /// </summary>
+    [YamlIgnore]
     public string FileExistsAction => FileExists.Equals("skip", StringComparison.OrdinalIgnoreCase) ? "Skip" : "Overwrite";
 
     /// <summary>
     /// Helper property to check if rule has a date filter
     /// </summary>
+    [YamlIgnore]
     public bool HasDateFilter => LastAccessedMins.HasValue || LastModifiedMins.HasValue || AgeCreatedMins.HasValue;
 
     /// <summary>
     /// Helper property to describe the date filter in human-readable format
     /// </summary>
+    [YamlIgnore]
     public string DateFilterDescription
     {
         get
@@ -92,6 +97,18 @@ public class FileRule
             return "None";
         }
     }
+
+    /// <summary>
+    /// Alias for DateFilterDescription (for backward compatibility with Tray UI)
+    /// </summary>
+    [YamlIgnore]
+    public string DateCriteria => DateFilterDescription;
+
+    /// <summary>
+    /// Helper property to display scan interval in human-readable format
+    /// </summary>
+    [YamlIgnore]
+    public string ScanIntervalDisplay => FormatMinutesToReadable(ScanIntervalMs / 60000);
 
     /// <summary>
     /// Formats minutes into a human-readable string with meaningful units

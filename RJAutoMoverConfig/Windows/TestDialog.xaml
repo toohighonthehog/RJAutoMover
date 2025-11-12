@@ -1,0 +1,13 @@
+<Window x:Class="RJAutoMoverConfig.Windows.TestDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Test Dialog"
+        Height="300" Width="400"
+        WindowStartupLocation="CenterOwner">
+    <Grid>
+        <StackPanel Margin="20" VerticalAlignment="Center">
+            <TextBlock Text="This is a test dialog" FontSize="16" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+            <Button Content="OK" Width="100" Height="30" Click="OkButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

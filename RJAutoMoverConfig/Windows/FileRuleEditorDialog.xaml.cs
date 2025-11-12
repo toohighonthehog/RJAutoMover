@@ -250,6 +250,10 @@ public partial class FileRuleEditorDialog : Window, INotifyPropertyChanged
     /// </summary>
     private void DateFilterRadio_Changed(object sender, RoutedEventArgs e)
     {
+        // Guard against being called during XAML initialization before all controls are created
+        if (LastAccessedMinsTextBox == null || LastModifiedMinsTextBox == null || AgeCreatedMinsTextBox == null)
+            return;
+
         // Clear previous values when switching
         if (sender == NoDateFilterRadio && NoDateFilterRadio.IsChecked == true)
         {

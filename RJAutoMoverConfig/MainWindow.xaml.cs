@@ -148,8 +148,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             System.Diagnostics.Debug.WriteLine($"AddRuleButton_Click: EXCEPTION: {ex.Message}");
             System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+
+            var errorText = $"Error opening rule editor:\n\n{ex.Message}\n\nStack Trace:\n{ex.StackTrace}\n\nInner Exception:\n{ex.InnerException?.Message ?? "None"}";
+
+            // Copy to clipboard
+            try
+            {
+                Clipboard.SetText(errorText);
+            }
+            catch { }
+
             MessageBox.Show(
-                $"Error opening rule editor:\n\n{ex.Message}\n\nStack Trace:\n{ex.StackTrace}",
+                errorText + "\n\n(Error details copied to clipboard)",
                 "Error",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -246,21 +256,54 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// <summary>
     /// Opens a save dialog to save the configuration to a new location
     /// </summary>
-    private void SaveAsButton_Click(object sender, RoutedEventArgs e)
+    private async void SaveAsButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new SaveFileDialog
+        try
         {
-            Title = "Save Configuration As",
-            Filter = "YAML files (*.yaml)|*.yaml|All files (*.*)|*.*",
-            DefaultExt = ".yaml",
-            FileName = "config.yaml",
-            InitialDirectory = Path.GetDirectoryName(ConfigFilePath)
-        };
+            System.Diagnostics.Debug.WriteLine("SaveAsButton_Click: Starting...");
 
-        if (dialog.ShowDialog() == true)
+            var dialog = new SaveFileDialog
+            {
+                Title = "Save Configuration As",
+                Filter = "YAML files (*.yaml)|*.yaml|All files (*.*)|*.*",
+                DefaultExt = ".yaml",
+                FileName = "config.yaml",
+                InitialDirectory = Path.GetDirectoryName(ConfigFilePath)
+            };
+
+            System.Diagnostics.Debug.WriteLine("SaveAsButton_Click: Showing dialog...");
+
+            if (dialog.ShowDialog() == true)
+            {
+                System.Diagnostics.Debug.WriteLine($"SaveAsButton_Click: File selected: {dialog.FileName}");
+                ConfigFilePath = dialog.FileName;
+                await SaveConfiguration();
+                System.Diagnostics.Debug.WriteLine("SaveAsButton_Click: Save completed.");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("SaveAsButton_Click: Dialog cancelled.");
+            }
+        }
+        catch (Exception ex)
         {
-            ConfigFilePath = dialog.FileName;
-            SaveConfiguration().Wait();
+            System.Diagnostics.Debug.WriteLine($"SaveAsButton_Click: EXCEPTION: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+
+            var errorText = $"Error saving configuration:\n\n{ex.Message}\n\nStack Trace:\n{ex.StackTrace}\n\nInner Exception:\n{ex.InnerException?.Message ?? "None"}";
+
+            // Copy to clipboard
+            try
+            {
+                Clipboard.SetText(errorText);
+            }
+            catch { }
+
+            MessageBox.Show(
+                errorText + "\n\n(Error details copied to clipboard)",
+                "Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 
@@ -652,19 +695,54 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     /// </summary>
     private void FileRulesDataGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (FileRulesDataGrid.SelectedItem is FileRule rule)
+        try
         {
-            var dialog = new FileRuleEditorDialog(rule)
-            {
-                Owner = this
-            };
+            System.Diagnostics.Debug.WriteLine("MouseDoubleClick: Starting...");
 
-            if (dialog.ShowDialog() == true)
+            if (FileRulesDataGrid.SelectedItem is FileRule rule)
             {
-                FileRulesDataGrid.Items.Refresh();
-                IsConfigValid = false;
-                UpdateValidationStatus("Configuration modified - validation required", false);
+                System.Diagnostics.Debug.WriteLine($"MouseDoubleClick: Rule selected: {rule.Name}");
+
+                var dialog = new FileRuleEditorDialog(rule)
+                {
+                    Owner = this
+                };
+
+                System.Diagnostics.Debug.WriteLine("MouseDoubleClick: Showing dialog...");
+
+                if (dialog.ShowDialog() == true)
+                {
+                    FileRulesDataGrid.Items.Refresh();
+                    IsConfigValid = false;
+                    UpdateValidationStatus("Configuration modified - validation required", false);
+                }
+
+                System.Diagnostics.Debug.WriteLine("MouseDoubleClick: Dialog closed.");
             }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("MouseDoubleClick: No rule selected or cast failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"MouseDoubleClick: EXCEPTION: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+
+            var errorText = $"Error opening rule editor (double-click):\n\n{ex.Message}\n\nStack Trace:\n{ex.StackTrace}\n\nInner Exception:\n{ex.InnerException?.Message ?? "None"}";
+
+            // Copy to clipboard
+            try
+            {
+                Clipboard.SetText(errorText);
+            }
+            catch { }
+
+            MessageBox.Show(
+                errorText + "\n\n(Error details copied to clipboard)",
+                "Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 
