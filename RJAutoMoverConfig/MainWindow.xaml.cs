@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -20,6 +21,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly ConfigEditorService _configService;
     private string _configFilePath;
     private bool _isConfigValid;
+    private bool _hasUnsavedChanges;
     private Configuration? _currentConfig;
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -66,8 +68,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             _isConfigValid = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(CanSave));
         }
     }
+
+    public bool HasUnsavedChanges
+    {
+        get => _hasUnsavedChanges;
+        set
+        {
+            _hasUnsavedChanges = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanSave));
+        }
+    }
+
+    public bool CanSave => IsConfigValid && HasUnsavedChanges;
 
     public bool IsAdministrator { get; }
 
@@ -139,6 +155,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             {
                 FileRules.Add(dialog.EditedRule);
                 IsConfigValid = false;
+                HasUnsavedChanges = true;
                 UpdateValidationStatus("Configuration modified - validation required", false);
             }
 
@@ -180,9 +197,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             if (dialog.ShowDialog() == true)
             {
+                // End any pending edit operations before refreshing
+                FileRulesDataGrid.CommitEdit(DataGridEditingUnit.Row, true);
                 // Refresh the DataGrid
                 FileRulesDataGrid.Items.Refresh();
                 IsConfigValid = false;
+                HasUnsavedChanges = true;
                 UpdateValidationStatus("Configuration modified - validation required", false);
             }
         }
@@ -211,6 +231,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             FileRules.Add(duplicatedRule);
             IsConfigValid = false;
+            HasUnsavedChanges = true;
             UpdateValidationStatus("Configuration modified - validation required", false);
         }
     }
@@ -232,6 +253,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             {
                 FileRules.Remove(rule);
                 IsConfigValid = false;
+                HasUnsavedChanges = true;
                 UpdateValidationStatus("Configuration modified - validation required", false);
             }
         }
@@ -393,6 +415,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ApplicationSettings = config.Application ?? new ApplicationConfig();
             OnPropertyChanged(nameof(ApplicationSettings));
 
+            // Reset unsaved changes flag after successful load
+            HasUnsavedChanges = false;
+
             // Automatically validate the loaded configuration (without showing message boxes)
             await ValidateConfiguration(showMessageBox: false);
         }
@@ -506,6 +531,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             // Save
             await _configService.SaveConfigurationAsync(ConfigFilePath, config);
+
+            // Reset unsaved changes flag after successful save
+            HasUnsavedChanges = false;
 
             UpdateValidationStatus("Configuration saved successfully!", true);
 
@@ -712,8 +740,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
                 if (dialog.ShowDialog() == true)
                 {
+                    // End any pending edit operations before refreshing
+                    FileRulesDataGrid.CommitEdit(DataGridEditingUnit.Row, true);
                     FileRulesDataGrid.Items.Refresh();
                     IsConfigValid = false;
+                    HasUnsavedChanges = true;
                     UpdateValidationStatus("Configuration modified - validation required", false);
                 }
 

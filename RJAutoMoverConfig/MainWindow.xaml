@@ -622,7 +622,7 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button x:Name="SaveButton" Content="Save Configuration" Style="{StaticResource ButtonStyle}"
                             Click="SaveButton_Click" Padding="20,8"
-                            IsEnabled="{Binding IsConfigValid}"/>
+                            IsEnabled="{Binding CanSave}"/>
                     <Button x:Name="SaveAsButton" Content="Save As..." Style="{StaticResource ButtonStyle}"
                             Click="SaveAsButton_Click" Padding="20,8"/>
                     <Button Content="Exit" Style="{StaticResource ButtonStyle}"
