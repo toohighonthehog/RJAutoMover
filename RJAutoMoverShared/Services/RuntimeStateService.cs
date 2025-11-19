@@ -125,32 +125,6 @@ public class RuntimeStateService
         }
     }
 
-    /// <summary>
-    /// Gets or sets whether dark mode is enabled in the UI.
-    /// Setting this value persists it to disk automatically.
-    /// </summary>
-    public bool DarkModeEnabled
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _currentState.DarkModeEnabled;
-            }
-        }
-        set
-        {
-            lock (_lock)
-            {
-                if (_currentState.DarkModeEnabled != value)
-                {
-                    _currentState.DarkModeEnabled = value;
-                    SaveState();
-                    _logger.Log(LogLevel.INFO, $"Dark mode changed to: {value}");
-                }
-            }
-        }
-    }
 
     /// <summary>
     /// Checks if runtime state file exists (used to determine if we should use config default)
@@ -207,8 +181,7 @@ public class RuntimeStateService
                 SessionStartTime = _currentState.SessionStartTime,
                 LastSessionEndTime = _currentState.LastSessionEndTime,
                 LastModifiedBy = _currentState.LastModifiedBy,
-                LastModified = _currentState.LastModified,
-                DarkModeEnabled = _currentState.DarkModeEnabled
+                LastModified = _currentState.LastModified
             };
         }
     }
@@ -301,7 +274,4 @@ public class RuntimeState
 
     [JsonPropertyName("lastModified")]
     public DateTime? LastModified { get; set; }
-
-    [JsonPropertyName("darkModeEnabled")]
-    public bool DarkModeEnabled { get; set; } = false;
 }

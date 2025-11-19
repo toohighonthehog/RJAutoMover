@@ -72,34 +72,6 @@
                     <TextBlock Text="Automated File Management Service" FontSize="12"
                                Foreground="#E0E0E0"/>
                 </StackPanel>
-
-                <!-- Dark Mode Toggle -->
-                <Button x:Name="DarkModeToggleButton" Grid.Column="2" VerticalAlignment="Center"
-                        Content="🌙 Dark" Padding="12,6" MinWidth="80" Click="DarkModeToggle_Click"
-                        Background="#4A90E2" Foreground="White" BorderThickness="0"
-                        FontSize="11" FontWeight="SemiBold" Cursor="Hand">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}"
-                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                BorderThickness="{TemplateBinding BorderThickness}"
-                                                CornerRadius="3" Padding="{TemplateBinding Padding}">
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                            <Style.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#357ABD"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
             </Grid>
         </Border>
 
@@ -293,9 +265,8 @@
                 </Border>
             </TabItem>
 
-            <!-- Configuration Tab -->
-            <!-- Job Config Tab (config.yaml) -->
-            <TabItem Header="Job Config">
+            <!-- Configuration Tab (config.yaml) -->
+            <TabItem Header="Configuration">
                 <Border Background="White" BorderBrush="#DDDDDD" BorderThickness="1,0,1,1" Padding="15">
                             <Grid>
                                 <Grid.RowDefinitions>
@@ -516,183 +487,6 @@
                 </Border>
             </TabItem>
 
-            <!-- Runtime State Tab (runtime-state.json) -->
-            <TabItem Header="Runtime State">
-                <Border Background="White" BorderBrush="#DDDDDD" BorderThickness="1,0,1,1" Padding="15">
-                            <Border Background="#F8F8F8" BorderBrush="#DDDDDD" BorderThickness="1" CornerRadius="5">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="*"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="White">
-                                        <Border Padding="15">
-                                        <StackPanel>
-                                            <!-- Runtime State Title -->
-                                            <TextBlock Text="Application Settings &amp; Controls" FontSize="14" FontWeight="Bold"
-                                                       Foreground="#357ABD" Margin="0,5,0,15"/>
-
-                                            <!-- Processing Controls -->
-                                            <TextBlock Text="Processing Controls" FontSize="12" FontWeight="Bold"
-                                                       Foreground="#666666" Margin="0,0,0,8"/>
-                                            <Border Background="#F8F8F8" BorderBrush="#DDDDDD"
-                                                    BorderThickness="1" Padding="12" CornerRadius="5" Margin="0,0,0,15">
-                                                <StackPanel>
-                                                    <Grid Margin="0,0,0,12">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="180"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0" Text="Processing Status:" FontSize="11"
-                                                                  Foreground="#666666" FontWeight="Bold" VerticalAlignment="Center"/>
-                                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                                            <TextBlock x:Name="RuntimeProcessingPausedText" FontSize="11"
-                                                                      Foreground="#333333" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                                            <Button x:Name="RuntimeToggleProcessingButton" Content="Pause Processing"
-                                                                    Padding="12,6" MinWidth="140" Click="RuntimeToggleProcessing_Click"
-                                                                    Background="#EEEEEE" Foreground="#333333" BorderThickness="0"
-                                                                    FontSize="11" FontWeight="Normal" Cursor="Hand">
-                                                                <Button.Style>
-                                                                    <Style TargetType="Button">
-                                                                        <Setter Property="Template">
-                                                                            <Setter.Value>
-                                                                                <ControlTemplate TargetType="Button">
-                                                                                    <Border Background="{TemplateBinding Background}"
-                                                                                            CornerRadius="3" Padding="{TemplateBinding Padding}">
-                                                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                                    </Border>
-                                                                                </ControlTemplate>
-                                                                            </Setter.Value>
-                                                                        </Setter>
-                                                                        <Style.Triggers>
-                                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                                <Setter Property="Background" Value="#DDDDDD"/>
-                                                                            </Trigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Button.Style>
-                                                            </Button>
-                                                        </StackPanel>
-                                                    </Grid>
-                                                </StackPanel>
-                                            </Border>
-
-                                            <!-- UI Settings -->
-                                            <TextBlock Text="UI Settings" FontSize="12" FontWeight="Bold"
-                                                       Foreground="#666666" Margin="0,0,0,8"/>
-                                            <Border Background="#F8F8F8" BorderBrush="#DDDDDD"
-                                                    BorderThickness="1" Padding="12" CornerRadius="5" Margin="0,0,0,20">
-                                                <Grid Margin="0,0,0,0">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="180"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="Dark Mode:" FontSize="11"
-                                                              Foreground="#666666" FontWeight="Bold" VerticalAlignment="Center"/>
-                                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                                        <TextBlock x:Name="RuntimeDarkModeText" FontSize="11"
-                                                                  Foreground="#333333" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                                        <Button x:Name="RuntimeToggleDarkModeButton" Content="Toggle Dark Mode"
-                                                                Padding="12,6" MinWidth="140" Click="RuntimeToggleDarkMode_Click"
-                                                                Background="#4A90E2" Foreground="White" BorderThickness="0"
-                                                                FontSize="11" FontWeight="SemiBold" Cursor="Hand">
-                                                            <Button.Style>
-                                                                <Style TargetType="Button">
-                                                                    <Setter Property="Template">
-                                                                        <Setter.Value>
-                                                                            <ControlTemplate TargetType="Button">
-                                                                                <Border Background="{TemplateBinding Background}"
-                                                                                        CornerRadius="3" Padding="{TemplateBinding Padding}">
-                                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                                </Border>
-                                                                            </ControlTemplate>
-                                                                        </Setter.Value>
-                                                                    </Setter>
-                                                                    <Style.Triggers>
-                                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                                            <Setter Property="Background" Value="#357ABD"/>
-                                                                        </Trigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Button.Style>
-                                                        </Button>
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
-
-                                            <!-- Session Information (Read-only) -->
-                                            <TextBlock Text="Service Session Information" FontSize="12" FontWeight="Bold"
-                                                       Foreground="#999999" Margin="0,0,0,8"/>
-                                            <Border Background="#FAFAFA" BorderBrush="#DDDDDD"
-                                                    BorderThickness="1" Padding="12" CornerRadius="5">
-                                                <StackPanel>
-                                                    <Grid Margin="0,0,0,8">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="180"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0" Text="Session ID:" FontSize="11"
-                                                                  Foreground="#999999" FontWeight="Bold"/>
-                                                        <TextBlock Grid.Column="1" x:Name="RuntimeSessionIdText" FontSize="11"
-                                                                  Foreground="#666666" FontFamily="Consolas" FontWeight="Normal"/>
-                                                    </Grid>
-                                                    <Grid Margin="0,0,0,8">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="180"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0" Text="Session Start Time:" FontSize="11"
-                                                                  Foreground="#999999" FontWeight="Bold"/>
-                                                        <TextBlock Grid.Column="1" x:Name="RuntimeSessionStartText" FontSize="11"
-                                                                  Foreground="#666666" FontWeight="Normal"/>
-                                                    </Grid>
-                                                    <Grid Margin="0,0,0,8">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="180"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0" Text="Last Session End Time:" FontSize="11"
-                                                                  Foreground="#999999" FontWeight="Bold"/>
-                                                        <TextBlock Grid.Column="1" x:Name="RuntimeLastSessionEndText" FontSize="11"
-                                                                  Foreground="#666666" FontWeight="Normal"/>
-                                                    </Grid>
-                                                    <Grid Margin="0,0,0,8">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="180"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0" Text="Last State Change By:" FontSize="11"
-                                                                  Foreground="#999999" FontWeight="Bold"/>
-                                                        <TextBlock Grid.Column="1" x:Name="RuntimeLastModifiedByText" FontSize="11"
-                                                                  Foreground="#666666" FontWeight="Normal"/>
-                                                    </Grid>
-                                                    <Grid Margin="0,0,0,0">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="180"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0" Text="Last State Change Time:" FontSize="11"
-                                                                  Foreground="#999999" FontWeight="Bold"/>
-                                                        <TextBlock Grid.Column="1" x:Name="RuntimeLastModifiedText" FontSize="11"
-                                                                  Foreground="#666666" FontWeight="Normal"/>
-                                                    </Grid>
-                                                </StackPanel>
-                                            </Border>
-                                        </StackPanel>
-                                        </Border>
-                                    </ScrollViewer>
-
-                                    <!-- Runtime State File Path Display -->
-                                    <TextBlock Grid.Row="1" x:Name="RuntimeStateFilePathText"
-                                               Padding="10,5" FontSize="9" FontStyle="Italic"
-                                               Foreground="#999999" TextWrapping="NoWrap"
-                                               Text=""/>
-                                </Grid>
-                            </Border>
-                </Border>
-            </TabItem>
-
             <!-- Logs Tab -->
             <TabItem Header="Logs">
                 <Border Background="White" BorderBrush="#DDDDDD" BorderThickness="1,0,1,1" Padding="15">
@@ -771,8 +565,8 @@
                 </Border>
             </TabItem>
 
-            <!-- System Information Tab -->
-            <TabItem Header="System">
+            <!-- Status Information Tab -->
+            <TabItem Header="Status">
                 <Border Background="White" BorderBrush="#DDDDDD" BorderThickness="1,0,1,1" Padding="15">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -942,65 +736,74 @@
                 </Border>
             </TabItem>
 
-            <!-- .NET Build Information Tab -->
-            <TabItem Header=".NET">
+            <!-- Version Information Tab -->
+            <TabItem Header="Version">
                 <Border Background="White" BorderBrush="#DDDDDD" BorderThickness="1,0,1,1" Padding="15">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="10"/>
-                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <!-- Build Information Section -->
-                        <Border Grid.Row="0" Background="#F8F8F8" BorderBrush="#DDDDDD"
-                                BorderThickness="1" Padding="12" CornerRadius="5">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="8"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="160"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+                        <!-- Toggle between Version Info and .NET Build Info -->
+                        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <Button x:Name="ShowVersionInfoButton" Content="Version Info"
+                                        Padding="10,5" Margin="0,0,5,0" Click="ShowVersionInfo_Click"
+                                        Background="#4A90E2" Foreground="White" BorderThickness="0" FontWeight="Bold">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{TemplateBinding Background}" CornerRadius="3" Padding="{TemplateBinding Padding}">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#357ABD"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <Button x:Name="ShowDotNetInfoButton" Content=".NET Build Info"
+                                        Padding="10,5" Click="ShowDotNetInfo_Click"
+                                        Background="#DDDDDD" Foreground="#333333" BorderThickness="0" FontWeight="Normal">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{TemplateBinding Background}" CornerRadius="3" Padding="{TemplateBinding Padding}">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#CCCCCC"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
 
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Build SDK Version:"
-                                           Style="{StaticResource InfoLabelStyle}"/>
-                                <TextBlock x:Name="SdkVersionText" Grid.Row="0" Grid.Column="1"
-                                           Style="{StaticResource InfoValueStyle}"/>
+                        <!-- Version Info View -->
+                        <Grid x:Name="VersionInfoView" Grid.Row="1" Visibility="Visible">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="20"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
 
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Current Runtime:"
-                                           Style="{StaticResource InfoLabelStyle}"/>
-                                <TextBlock x:Name="CurrentRuntimeVersionText" Grid.Row="2" Grid.Column="1"
-                                           Style="{StaticResource InfoValueStyle}"/>
-                            </Grid>
-                        </Border>
-
-                        <!-- NuGet Packages Section -->
-                        <Border Grid.Row="2" Background="#F8F8F8" BorderBrush="#DDDDDD"
-                                BorderThickness="1" Padding="12" CornerRadius="5">
-                            <TextBlock x:Name="PackageVersionsText"
-                                       FontFamily="Consolas, Courier New" FontSize="10"
-                                       Foreground="#333333" TextWrapping="Wrap"
-                                       Text="Loading package information..."/>
-                        </Border>
-                    </Grid>
-                </Border>
-            </TabItem>
-
-            <!-- Version Information Tab -->
-            <TabItem Header="Version">
-                <Border Background="White" BorderBrush="#DDDDDD" BorderThickness="1,0,1,1" Padding="20">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="20"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <!-- Tray Version -->
+                            <!-- Tray Version -->
                         <Border Grid.Row="0" Background="#F8F8F8" BorderBrush="#DDDDDD"
                                 BorderThickness="1" Padding="15" CornerRadius="5">
                             <Grid>
@@ -1119,6 +922,51 @@
                                            Style="{StaticResource InfoValueStyle}"/>
                             </Grid>
                         </Button>
+                        </Grid>
+
+                        <!-- .NET Build Info View -->
+                        <Grid x:Name="DotNetInfoView" Grid.Row="1" Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="10"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Build Information Section -->
+                            <Border Grid.Row="0" Background="#F8F8F8" BorderBrush="#DDDDDD"
+                                    BorderThickness="1" Padding="12" CornerRadius="5">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="8"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="160"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Build SDK Version:"
+                                               Style="{StaticResource InfoLabelStyle}"/>
+                                    <TextBlock x:Name="SdkVersionText" Grid.Row="0" Grid.Column="1"
+                                               Style="{StaticResource InfoValueStyle}"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Current Runtime:"
+                                               Style="{StaticResource InfoLabelStyle}"/>
+                                    <TextBlock x:Name="CurrentRuntimeVersionText" Grid.Row="2" Grid.Column="1"
+                                               Style="{StaticResource InfoValueStyle}"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- NuGet Packages Section -->
+                            <Border Grid.Row="2" Background="#F8F8F8" BorderBrush="#DDDDDD"
+                                    BorderThickness="1" Padding="12" CornerRadius="5">
+                                <TextBlock x:Name="PackageVersionsText"
+                                           FontFamily="Consolas, Courier New" FontSize="10"
+                                           Foreground="#333333" TextWrapping="Wrap"
+                                           Text="Loading package information..."/>
+                            </Border>
+                        </Grid>
                     </Grid>
                 </Border>
             </TabItem>

@@ -92,9 +92,6 @@ public partial class AboutWindow : Window
             _transfersAnimationTimer.Tick += TransfersAnimationTimer_Tick;
             _transfersAnimationTimer.Start();
 
-            // Apply initial theme based on runtime state
-            ApplyTheme(App.RuntimeState?.DarkModeEnabled ?? false);
-
             // Setup periodic version check timer (refresh every minute)
             _versionCheckTimer = new System.Windows.Threading.DispatcherTimer
             {
@@ -313,11 +310,12 @@ public partial class AboutWindow : Window
             if (selectedTab?.Header?.ToString() == "Version")
             {
                 // Refresh version information when Version tab is opened
-                await RefreshVersionTab();
+                // Fire and forget - don't block tab opening on version check
+                _ = RefreshVersionTab();
             }
-            else if (selectedTab?.Header?.ToString() == "System")
+            else if (selectedTab?.Header?.ToString() == "Status")
             {
-                // Load database statistics when System tab is opened
+                // Load database statistics when Status tab is opened
                 await LoadDatabaseStatistics();
             }
         }
@@ -328,6 +326,9 @@ public partial class AboutWindow : Window
     /// </summary>
     private async System.Threading.Tasks.Task RefreshVersionTab()
     {
+        // Yield immediately to allow UI to render
+        await System.Threading.Tasks.Task.Yield();
+
         // Refresh tray version
         var (trayVersion, trayBuildDate) = GetTrayVersionInfo();
         TrayVersionText.Text = trayVersion;
@@ -386,82 +387,6 @@ public partial class AboutWindow : Window
         }
     }
 
-    private void LoadRuntimeStateInformation()
-    {
-        try
-        {
-            if (App.RuntimeState == null)
-            {
-                // Set default "unavailable" text for all fields
-                if (RuntimeSessionIdText != null) RuntimeSessionIdText.Text = "(unavailable)";
-                if (RuntimeSessionStartText != null) RuntimeSessionStartText.Text = "(unavailable)";
-                if (RuntimeLastSessionEndText != null) RuntimeLastSessionEndText.Text = "(unavailable)";
-                if (RuntimeProcessingPausedText != null) RuntimeProcessingPausedText.Text = "(unavailable)";
-                if (RuntimeLastModifiedByText != null) RuntimeLastModifiedByText.Text = "(unavailable)";
-                if (RuntimeLastModifiedText != null) RuntimeLastModifiedText.Text = "(unavailable)";
-                if (RuntimeDarkModeText != null) RuntimeDarkModeText.Text = "(unavailable)";
-                if (RuntimeStateFilePathText != null) RuntimeStateFilePathText.Text = "Runtime state file: (unavailable)";
-                return;
-            }
-
-            var state = App.RuntimeState.GetState();
-
-            // Session Information
-            if (RuntimeSessionIdText != null)
-                RuntimeSessionIdText.Text = state.SessionId ?? "(none)";
-
-            if (RuntimeSessionStartText != null)
-                RuntimeSessionStartText.Text = state.SessionStartTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-
-            if (RuntimeLastSessionEndText != null)
-                RuntimeLastSessionEndText.Text = state.LastSessionEndTime.HasValue
-                    ? state.LastSessionEndTime.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
-                    : "(not yet ended)";
-
-            // Processing State
-            if (RuntimeProcessingPausedText != null)
-            {
-                RuntimeProcessingPausedText.Text = state.ProcessingPaused ? "YES" : "NO";
-                RuntimeProcessingPausedText.Foreground = state.ProcessingPaused
-                    ? new SolidColorBrush(Color.FromRgb(0xE7, 0x4C, 0x3C))
-                    : new SolidColorBrush(Color.FromRgb(0x2E, 0xCC, 0x71));
-            }
-
-            if (RuntimeLastModifiedByText != null)
-                RuntimeLastModifiedByText.Text = state.LastModifiedBy ?? "(none)";
-
-            if (RuntimeLastModifiedText != null)
-                RuntimeLastModifiedText.Text = state.LastModified.HasValue
-                    ? state.LastModified.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
-                    : "(never)";
-
-            // UI Preferences
-            if (RuntimeDarkModeText != null)
-            {
-                RuntimeDarkModeText.Text = state.DarkModeEnabled ? "YES" : "NO";
-                RuntimeDarkModeText.Foreground = state.DarkModeEnabled
-                    ? new SolidColorBrush(Color.FromRgb(0x4A, 0x90, 0xE2))
-                    : new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66));
-            }
-
-            // Runtime state file path
-            if (RuntimeStateFilePathText != null)
-            {
-                var stateFilePath = System.IO.Path.Combine(
-                    RJAutoMoverShared.Constants.Paths.GetSharedDataFolder(),
-                    "runtime-state.json");
-                RuntimeStateFilePathText.Text = $"Runtime state file: {stateFilePath}";
-            }
-
-            // Update the runtime processing button appearance
-            UpdateRuntimeProcessingButton();
-        }
-        catch (Exception ex)
-        {
-            // Silently fail - don't crash the About window
-            System.Diagnostics.Debug.WriteLine($"Error loading runtime state: {ex.Message}");
-        }
-    }
 
     private void LoadAboutInformation()
     {
@@ -475,9 +400,6 @@ public partial class AboutWindow : Window
 
             // Load memory usage
             LoadMemoryUsage();
-
-            // Load runtime state information
-            LoadRuntimeStateInformation();
 
             // Load system information
             LoadSystemInformation();
@@ -1457,6 +1379,36 @@ public partial class AboutWindow : Window
         }
     }
 
+    private void ShowVersionInfo_Click(object sender, RoutedEventArgs e)
+    {
+        if (VersionInfoView != null && DotNetInfoView != null)
+        {
+            VersionInfoView.Visibility = Visibility.Visible;
+            DotNetInfoView.Visibility = Visibility.Collapsed;
+            ShowVersionInfoButton.Background = new SolidColorBrush(Color.FromRgb(74, 144, 226));
+            ShowVersionInfoButton.Foreground = new SolidColorBrush(Colors.White);
+            ShowVersionInfoButton.FontWeight = FontWeights.Bold;
+            ShowDotNetInfoButton.Background = new SolidColorBrush(Color.FromRgb(221, 221, 221));
+            ShowDotNetInfoButton.Foreground = new SolidColorBrush(Color.FromRgb(51, 51, 51));
+            ShowDotNetInfoButton.FontWeight = FontWeights.Normal;
+        }
+    }
+
+    private void ShowDotNetInfo_Click(object sender, RoutedEventArgs e)
+    {
+        if (VersionInfoView != null && DotNetInfoView != null)
+        {
+            VersionInfoView.Visibility = Visibility.Collapsed;
+            DotNetInfoView.Visibility = Visibility.Visible;
+            ShowDotNetInfoButton.Background = new SolidColorBrush(Color.FromRgb(74, 144, 226));
+            ShowDotNetInfoButton.Foreground = new SolidColorBrush(Colors.White);
+            ShowDotNetInfoButton.FontWeight = FontWeights.Bold;
+            ShowVersionInfoButton.Background = new SolidColorBrush(Color.FromRgb(221, 221, 221));
+            ShowVersionInfoButton.Foreground = new SolidColorBrush(Color.FromRgb(51, 51, 51));
+            ShowVersionInfoButton.FontWeight = FontWeights.Normal;
+        }
+    }
+
     private string FormatInterval(int milliseconds)
     {
         if (milliseconds < 1000)
@@ -2358,215 +2310,8 @@ public partial class AboutWindow : Window
 
     #endregion
 
-    #region Dark Mode
 
-    /// <summary>
-    /// Handles dark mode toggle button click (header button).
-    /// </summary>
-    private void DarkModeToggle_Click(object sender, RoutedEventArgs e)
-    {
-        if (App.RuntimeState != null)
-        {
-            var isDark = !App.RuntimeState.DarkModeEnabled;
-            App.RuntimeState.DarkModeEnabled = isDark;
-            ApplyTheme(isDark);
-            LoadRuntimeStateInformation(); // Refresh the Runtime State tab display
-        }
-    }
 
-    /// <summary>
-    /// Handles runtime dark mode toggle button click (from Runtime State tab).
-    /// </summary>
-    private void RuntimeToggleDarkMode_Click(object sender, RoutedEventArgs e)
-    {
-        if (App.RuntimeState != null)
-        {
-            var isDark = !App.RuntimeState.DarkModeEnabled;
-            App.RuntimeState.DarkModeEnabled = isDark;
-            ApplyTheme(isDark);
-            LoadRuntimeStateInformation(); // Refresh the Runtime State tab display
-        }
-    }
-
-    /// <summary>
-    /// Handles runtime processing toggle button click (from Runtime State tab).
-    /// </summary>
-    private async void RuntimeToggleProcessing_Click(object sender, RoutedEventArgs e)
-    {
-        if (_trayIconService != null)
-        {
-            try
-            {
-                await _trayIconService.ToggleProcessing();
-                // The state will be updated via the SetProcessingPaused callback
-                // Wait a moment then refresh the display
-                await Task.Delay(500);
-                LoadRuntimeStateInformation();
-                UpdateRuntimeProcessingButton();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error toggling processing: {ex.Message}", "Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Updates the runtime processing toggle button appearance based on current state.
-    /// </summary>
-    private void UpdateRuntimeProcessingButton()
-    {
-        if (RuntimeToggleProcessingButton != null)
-        {
-            RuntimeToggleProcessingButton.Content = _isProcessingPaused ? "Resume Processing" : "Pause Processing";
-
-            // Update button appearance for better visibility when paused
-            if (_isProcessingPaused)
-            {
-                // Yellow background with dark text for paused state
-                RuntimeToggleProcessingButton.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07));
-                RuntimeToggleProcessingButton.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
-                RuntimeToggleProcessingButton.FontWeight = FontWeights.Bold;
-            }
-            else
-            {
-                // Gray background for normal state
-                RuntimeToggleProcessingButton.Background = new SolidColorBrush(Color.FromRgb(0xEE, 0xEE, 0xEE));
-                RuntimeToggleProcessingButton.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
-                RuntimeToggleProcessingButton.FontWeight = FontWeights.Normal;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Applies light or dark theme to all UI elements.
-    /// </summary>
-    private void ApplyTheme(bool isDark)
-    {
-        try
-        {
-            // Update toggle button appearance based on current mode
-            if (DarkModeToggleButton != null)
-            {
-                if (isDark)
-                {
-                    // Dark mode active - show "Light" button with light colors
-                    DarkModeToggleButton.Content = "☀️ Light";
-                    DarkModeToggleButton.Background = new SolidColorBrush(Color.FromRgb(0xF5, 0xF5, 0xF5)); // Light gray
-                    DarkModeToggleButton.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)); // Dark text
-                }
-                else
-                {
-                    // Light mode active - show "Dark" button with dark colors
-                    DarkModeToggleButton.Content = "🌙 Dark";
-                    DarkModeToggleButton.Background = new SolidColorBrush(Color.FromRgb(0x4A, 0x90, 0xE2)); // Blue
-                    DarkModeToggleButton.Foreground = new SolidColorBrush(Colors.White);
-                }
-            }
-
-            // Define color schemes
-            var windowBg = isDark ? Color.FromRgb(0x1E, 0x1E, 0x1E) : Color.FromRgb(0xF5, 0xF5, 0xF5);
-            var tabBg = isDark ? Color.FromRgb(0x2D, 0x2D, 0x30) : Colors.White;
-            var borderColor = isDark ? Color.FromRgb(0x3E, 0x3E, 0x42) : Color.FromRgb(0xDD, 0xDD, 0xDD);
-            var textPrimary = isDark ? Color.FromRgb(0xE0, 0xE0, 0xE0) : Color.FromRgb(0x33, 0x33, 0x33);
-            var textSecondary = isDark ? Color.FromRgb(0xA0, 0xA0, 0xA0) : Color.FromRgb(0x66, 0x66, 0x66);
-            var textTertiary = isDark ? Color.FromRgb(0x80, 0x80, 0x80) : Color.FromRgb(0x99, 0x99, 0x99);
-            var accentBlue = isDark ? Color.FromRgb(0x4A, 0x90, 0xE2) : Color.FromRgb(0x35, 0x7A, 0xBD);
-            var contentBg = isDark ? Color.FromRgb(0x25, 0x25, 0x28) : Color.FromRgb(0xF8, 0xF8, 0xF8);
-            var hoverBg = isDark ? Color.FromRgb(0x3E, 0x3E, 0x42) : Color.FromRgb(0xE0, 0xE0, 0xE0);
-
-            // Transfer row colors
-            var successBg = isDark ? Color.FromRgb(0x1A, 0x2F, 0x1A) : Color.FromRgb(0xF0, 0xFF, 0xF0);
-            var failedBg = isDark ? Color.FromRgb(0x2F, 0x1A, 0x1A) : Color.FromRgb(0xFF, 0xF0, 0xF0);
-            var warningBg = isDark ? Color.FromRgb(0x2F, 0x2A, 0x1A) : Color.FromRgb(0xFF, 0xF8, 0xDC);
-            var inProgressBg = isDark ? Color.FromRgb(0x1A, 0x25, 0x2F) : Color.FromRgb(0xE8, 0xF4, 0xF8);
-
-            // Apply to window
-            this.Background = new SolidColorBrush(windowBg);
-
-            // Update resource styles
-            if (Resources["InfoLabelStyle"] is Style infoLabelStyle)
-            {
-                foreach (var setter in infoLabelStyle.Setters.OfType<Setter>())
-                {
-                    if (setter.Property == TextBlock.ForegroundProperty)
-                        setter.Value = new SolidColorBrush(textSecondary);
-                }
-            }
-
-            if (Resources["InfoValueStyle"] is Style infoValueStyle)
-            {
-                foreach (var setter in infoValueStyle.Setters.OfType<Setter>())
-                {
-                    if (setter.Property == TextBlock.ForegroundProperty)
-                        setter.Value = new SolidColorBrush(textPrimary);
-                }
-            }
-
-            if (Resources["SectionHeaderStyle"] is Style sectionHeaderStyle)
-            {
-                foreach (var setter in sectionHeaderStyle.Setters.OfType<Setter>())
-                {
-                    if (setter.Property == TextBlock.ForegroundProperty)
-                        setter.Value = new SolidColorBrush(accentBlue);
-                }
-            }
-
-            // Apply theme to all tabs
-            ApplyTransfersTheme(isDark, tabBg, borderColor, textPrimary, textSecondary, textTertiary, contentBg, hoverBg, successBg, failedBg, warningBg, inProgressBg);
-            ApplyConfigTheme(isDark, tabBg, borderColor, textPrimary, textSecondary, contentBg);
-            ApplyLogsTheme(isDark, tabBg, borderColor, textPrimary, contentBg);
-            ApplySystemTheme(isDark, tabBg, textPrimary, textSecondary);
-            ApplyDotNetTheme(isDark, tabBg, textPrimary, textSecondary);
-            ApplyVersionTheme(isDark, tabBg, textPrimary, textSecondary);
-            ApplyErrorTheme(isDark, tabBg, textPrimary, textSecondary);
-        }
-        catch (Exception ex)
-        {
-            // Silently fail - don't crash the About window
-            System.Diagnostics.Debug.WriteLine($"Error applying theme: {ex.Message}");
-        }
-    }
-
-    private void ApplyTransfersTheme(bool isDark, Color tabBg, Color borderColor, Color textPrimary, Color textSecondary, Color textTertiary, Color contentBg, Color hoverBg, Color successBg, Color failedBg, Color warningBg, Color inProgressBg)
-    {
-        // This method would update transfer-specific colors
-        // For now, the DataTriggers in XAML will handle row colors
-        // We'd need to add x:Name to elements to update them dynamically
-    }
-
-    private void ApplyConfigTheme(bool isDark, Color tabBg, Color borderColor, Color textPrimary, Color textSecondary, Color contentBg)
-    {
-        // Config tab theme updates
-    }
-
-    private void ApplyLogsTheme(bool isDark, Color tabBg, Color borderColor, Color textPrimary, Color contentBg)
-    {
-        // Logs tab theme updates
-    }
-
-    private void ApplySystemTheme(bool isDark, Color tabBg, Color textPrimary, Color textSecondary)
-    {
-        // System tab theme updates
-    }
-
-    private void ApplyDotNetTheme(bool isDark, Color tabBg, Color textPrimary, Color textSecondary)
-    {
-        // .NET tab theme updates
-    }
-
-    private void ApplyVersionTheme(bool isDark, Color tabBg, Color textPrimary, Color textSecondary)
-    {
-        // Version tab theme updates
-    }
-
-    private void ApplyErrorTheme(bool isDark, Color tabBg, Color textPrimary, Color textSecondary)
-    {
-        // Error tab theme updates
-    }
-
-    #endregion
 }
 
 #region ViewModels

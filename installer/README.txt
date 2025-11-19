@@ -1,5 +1,5 @@
 ================================================================================
-                          RJAutoMover v0.9.6.74
+                          RJAutoMover v0.9.6.77
         Automated File Processing and Movement Service with Tray Monitor
 ================================================================================
 
@@ -928,7 +928,7 @@ Disclaimer:
 VERSION INFORMATION
 ================================================================================
 
-Version: 0.9.6.74
+Version: 0.9.6.77
 Release Date: October 2025
 Built with: .NET 10.0
 Platform: Windows 10/11, Windows Server 2016+

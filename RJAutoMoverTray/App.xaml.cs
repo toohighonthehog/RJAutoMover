@@ -118,10 +118,10 @@ public partial class App : Application
 
         _logger.Log(RJAutoMoverShared.Models.LogLevel.INFO, "RJTray starting...");
 
-        // Initialize runtime state service (for dark mode and other UI preferences)
+        // Initialize runtime state service (for UI preferences)
         _runtimeState = new RJAutoMoverShared.Services.RuntimeStateService(_logger);
         RuntimeState = _runtimeState;
-        _logger.Log(RJAutoMoverShared.Models.LogLevel.INFO, $"Runtime state initialized - Dark mode: {_runtimeState.DarkModeEnabled}");
+        _logger.Log(RJAutoMoverShared.Models.LogLevel.INFO, "Runtime state initialized");
 
         // Start memory monitoring timer with configured values
         _memoryTimer.Interval = _memoryCheckMs;
