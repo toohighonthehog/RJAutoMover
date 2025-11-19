@@ -16,6 +16,23 @@
 
 ## In Progress / To Do
 
+- [ ] Remove dark mode - we don't need it.
+- [ ] Version tab slow to appear.
+- [ ] The text in dropdowns in Logs and Transfer don't appear to be vertically centered very well.
+- [ ] System tab should be renamed to status.
+- [ ] Runtime state (i.e. pause processing) is already in the transfers tab, so we can get rid of the runtime state tab.
+- [ ] Rename 'Job Config' tab to just 'Configuration'.
+- [ ] .NET and Version tabs can be conbined into a single Version tab, with two buttons (similar to the way job config is formatted) for .NET
+- [ ] Depending on the application state, the usually blue band at the top should change colour to reflect the current state.  Make sure the background text is appropriately contrasted.
+- [ ] Change the order of the tabs to;
+    		Transfers
+    		Config
+    		Logs
+    		System
+    		Version
+- [ ] Incorporate config editor into app, so, currently, we have two buttons in the job config tab (passed view, raw yaml), add an 'edit config' button.  I don't think we need to config executable any more.
+
+- [ ] Test the rules processing.
 
 ## Notes
 
