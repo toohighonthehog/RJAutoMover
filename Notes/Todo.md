@@ -31,7 +31,6 @@
     		System
     		Version
 - [ ] Incorporate config editor into app, so, currently, we have two buttons in the job config tab (passed view, raw yaml), add an 'edit config' button.  I don't think we need to config executable any more.
-
 - [ ] Test the rules processing.
 
 ## Notes
