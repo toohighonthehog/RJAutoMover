@@ -17,6 +17,7 @@
 ## In Progress / To Do
 
 - [ ] Remove dark mode - we don't need it.
+- [ ] We get the status icon in the tray briefly flickering red for no obvious reason.
 - [ ] Version tab slow to appear.
 - [ ] The text in dropdowns in Logs and Transfer don't appear to be vertically centered very well.
 - [ ] System tab should be renamed to status.
