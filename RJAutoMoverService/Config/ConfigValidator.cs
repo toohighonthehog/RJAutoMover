@@ -485,25 +485,20 @@ public class ConfigValidator
             // Validate OTHERS extension rules
             if (isAllRule)
             {
-                // OTHERS rules MUST have exactly one date criteria
-                var dateCriteriaCountForAll = 0;
-                if (rule.LastAccessedMins.HasValue) dateCriteriaCountForAll++;
-                if (rule.LastModifiedMins.HasValue) dateCriteriaCountForAll++;
-                if (rule.AgeCreatedMins.HasValue) dateCriteriaCountForAll++;
-
-                if (dateCriteriaCountForAll == 0)
+                // OTHERS rules MUST have a date filter
+                if (!rule.HasDateFilter)
                 {
                     if (isActiveRule)
                     {
                         return new ValidationResult
                         {
                             IsValid = false,
-                            ErrorMessage = $"Rule '{rule.Name}': Extension 'OTHERS' rules MUST have a date criteria (LastAccessedMins, LastModifiedMins, or AgeCreatedMins)"
+                            ErrorMessage = $"Rule '{rule.Name}': Extension 'OTHERS' rules MUST have a DateFilter specified"
                         };
                     }
                     else
                     {
-                        inactiveRuleIssues.Add($"Rule '{rule.Name}': Extension 'OTHERS' rules MUST have a date criteria");
+                        inactiveRuleIssues.Add($"Rule '{rule.Name}': Extension 'OTHERS' rules MUST have a DateFilter specified");
                     }
                 }
 
@@ -603,146 +598,23 @@ public class ConfigValidator
                 }
             }
 
-            // Validate date criteria (LastAccessedMins, LastModifiedMins, AgeCreatedMins)
-            // Only one can be set per rule - mutual exclusivity check
-            var dateCriteriaCount = 0;
-            var dateCriteriaNames = new List<string>();
-
-            if (rule.LastAccessedMins.HasValue)
+            // Validate DateFilter (if specified)
+            if (!string.IsNullOrWhiteSpace(rule.DateFilter))
             {
-                dateCriteriaCount++;
-                dateCriteriaNames.Add("LastAccessedMins");
-            }
-            if (rule.LastModifiedMins.HasValue)
-            {
-                dateCriteriaCount++;
-                dateCriteriaNames.Add("LastModifiedMins");
-            }
-            if (rule.AgeCreatedMins.HasValue)
-            {
-                dateCriteriaCount++;
-                dateCriteriaNames.Add("AgeCreatedMins");
-            }
-
-            // Check mutual exclusivity
-            if (dateCriteriaCount > 1)
-            {
-                if (isActiveRule)
-                {
-                    return new ValidationResult
-                    {
-                        IsValid = false,
-                        ErrorMessage = $"Rule '{rule.Name}': Only one date criteria can be specified. Found: {string.Join(", ", dateCriteriaNames)}. Remove all but one date criteria."
-                    };
-                }
-                else
-                {
-                    inactiveRuleIssues.Add($"Rule '{rule.Name}': Only one date criteria can be specified. Found: {string.Join(", ", dateCriteriaNames)}");
-                }
-            }
-
-            // Validate individual date criteria values (allow negative, range: -5256000 to +5256000 minutes = +/- 10 years)
-            // Positive = older than X minutes, Negative = within last X minutes, Zero = not allowed
-            const int maxMinutes = 5256000; // 10 years in minutes
-
-            if (rule.LastAccessedMins.HasValue)
-            {
-                if (rule.LastAccessedMins.Value == 0)
+                var (isValid, errorMessage) = RJAutoMoverShared.Helpers.DateFilterHelper.Validate(rule.DateFilter);
+                if (!isValid)
                 {
                     if (isActiveRule)
                     {
                         return new ValidationResult
                         {
                             IsValid = false,
-                            ErrorMessage = $"LastAccessedMins cannot be zero for rule '{rule.Name}'. Use positive (older than) or negative (within last) values."
+                            ErrorMessage = $"Rule '{rule.Name}': {errorMessage}"
                         };
                     }
                     else
                     {
-                        inactiveRuleIssues.Add($"Rule '{rule.Name}': LastAccessedMins cannot be zero");
-                    }
-                }
-                else if (Math.Abs(rule.LastAccessedMins.Value) > maxMinutes)
-                {
-                    if (isActiveRule)
-                    {
-                        return new ValidationResult
-                        {
-                            IsValid = false,
-                            ErrorMessage = $"LastAccessedMins must be between -{maxMinutes} and +{maxMinutes} (+/- 10 years) for rule '{rule.Name}' (found: {rule.LastAccessedMins.Value})"
-                        };
-                    }
-                    else
-                    {
-                        inactiveRuleIssues.Add($"Rule '{rule.Name}': LastAccessedMins must be between -{maxMinutes} and +{maxMinutes} (found: {rule.LastAccessedMins.Value})");
-                    }
-                }
-            }
-
-            if (rule.LastModifiedMins.HasValue)
-            {
-                if (rule.LastModifiedMins.Value == 0)
-                {
-                    if (isActiveRule)
-                    {
-                        return new ValidationResult
-                        {
-                            IsValid = false,
-                            ErrorMessage = $"LastModifiedMins cannot be zero for rule '{rule.Name}'. Use positive (older than) or negative (within last) values."
-                        };
-                    }
-                    else
-                    {
-                        inactiveRuleIssues.Add($"Rule '{rule.Name}': LastModifiedMins cannot be zero");
-                    }
-                }
-                else if (Math.Abs(rule.LastModifiedMins.Value) > maxMinutes)
-                {
-                    if (isActiveRule)
-                    {
-                        return new ValidationResult
-                        {
-                            IsValid = false,
-                            ErrorMessage = $"LastModifiedMins must be between -{maxMinutes} and +{maxMinutes} (+/- 10 years) for rule '{rule.Name}' (found: {rule.LastModifiedMins.Value})"
-                        };
-                    }
-                    else
-                    {
-                        inactiveRuleIssues.Add($"Rule '{rule.Name}': LastModifiedMins must be between -{maxMinutes} and +{maxMinutes} (found: {rule.LastModifiedMins.Value})");
-                    }
-                }
-            }
-
-            if (rule.AgeCreatedMins.HasValue)
-            {
-                if (rule.AgeCreatedMins.Value == 0)
-                {
-                    if (isActiveRule)
-                    {
-                        return new ValidationResult
-                        {
-                            IsValid = false,
-                            ErrorMessage = $"AgeCreatedMins cannot be zero for rule '{rule.Name}'. Use positive (older than) or negative (within last) values."
-                        };
-                    }
-                    else
-                    {
-                        inactiveRuleIssues.Add($"Rule '{rule.Name}': AgeCreatedMins cannot be zero");
-                    }
-                }
-                else if (Math.Abs(rule.AgeCreatedMins.Value) > maxMinutes)
-                {
-                    if (isActiveRule)
-                    {
-                        return new ValidationResult
-                        {
-                            IsValid = false,
-                            ErrorMessage = $"AgeCreatedMins must be between -{maxMinutes} and +{maxMinutes} (+/- 10 years) for rule '{rule.Name}' (found: {rule.AgeCreatedMins.Value})"
-                        };
-                    }
-                    else
-                    {
-                        inactiveRuleIssues.Add($"Rule '{rule.Name}': AgeCreatedMins must be between -{maxMinutes} and +{maxMinutes} (found: {rule.AgeCreatedMins.Value})");
+                        inactiveRuleIssues.Add($"Rule '{rule.Name}': {errorMessage}");
                     }
                 }
             }

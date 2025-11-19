@@ -5,7 +5,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.9.6.47-blue.svg)](https://github.com/toohighonthehog/RJAutoMover)
+[![Version](https://img.shields.io/badge/version-0.9.6.74-blue.svg)](https://github.com/toohighonthehog/RJAutoMover)
 [![.NET](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/download/dotnet/10.0)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE.txt)
 
@@ -15,7 +15,7 @@
 
 ## 📥 Download & Install
 
-**[Download RJAutoMoverSetup.exe](https://github.com/toohighonthehog/RJAutoMover/blob/main/installer/RJAutoMoverSetup.exe)** (Version 0.9.6.47)
+**[Download RJAutoMoverSetup.exe](https://github.com/toohighonthehog/RJAutoMover/blob/main/installer/RJAutoMoverSetup.exe)** (Version 0.9.6.74)
 
 Simply run the installer with administrator privileges - it handles everything automatically, including service installation and configuration.
 
@@ -180,6 +180,7 @@ FileRules:
     IsActive: true
     Name: Video Files
     FileExists: skip
+    DateFilter: "LA:+10080"  # Archive videos not accessed in 7 days
 
   - SourceFolder: C:\Users\YourName\Downloads
     Extension: .doc|.docx|.xls|.xlsx|.pdf
@@ -188,6 +189,7 @@ FileRules:
     IsActive: true
     Name: Document Files
     FileExists: overwrite
+    DateFilter: "LM:-60"  # Process documents modified in last hour
 
 Application:
   ProcessingPaused: false
@@ -211,9 +213,7 @@ Application:
 | `IsActive` | Enable/disable this rule | `true` or `false` | `true` |
 | `Name` | Friendly name for the rule (required) | Any non-empty string | `"My Documents"` |
 | `FileExists` | Action if file exists in destination | `skip` or `overwrite` | `skip` |
-| `LastAccessedMins` | Only move files accessed within X minutes (optional) | `1` - `5256000` (1 min - 10 years) | `1440` (24 hours) |
-| `LastModifiedMins` | Only move files modified within X minutes (optional) | `1` - `5256000` (1 min - 10 years) | `60` (1 hour) |
-| `AgeCreatedMins` | Only move files older than X minutes (optional) | `1` - `5256000` (1 min - 10 years) | `10080` (7 days) |
+| `DateFilter` | Optional date-based filtering (see below) | Format: `TYPE:SIGN:MINUTES` | `LA:+43200` (30 days) |
 
 **FileRule Validation Rules:**
 
@@ -235,20 +235,25 @@ Application:
 - `skip` - Skip file if it exists in destination (default, recommended)
 - `overwrite` - Replace existing file in destination
 
-✅ **Date Criteria (Optional - Mutually Exclusive):**
-- **Only ONE date criteria can be specified per rule**
-- `LastAccessedMins` - Only move files that were last accessed within X minutes
-  - Example: `1440` = only move files accessed in the last 24 hours
-  - Use case: Archive recently accessed files while ignoring old ones
-- `LastModifiedMins` - Only move files that were last modified within X minutes
-  - Example: `60` = only move files modified in the last hour
-  - Use case: Process recently changed files immediately
-- `AgeCreatedMins` - Only move files that are OLDER than X minutes (created at least X minutes ago)
-  - Example: `10080` = only move files created at least 7 days ago
-  - Use case: Archive old files while leaving recent ones alone
-- **Range:** 1 - 5,256,000 minutes (1 minute to 10 years)
-- **Validation:** If multiple date criteria are specified, configuration will fail with an error
-- **Omitting date criteria:** If not specified, all files matching extensions will be moved regardless of age
+✅ **Date Filter (Optional):**
+- **Format:** `"TYPE:SIGN:MINUTES"` (single string)
+- **TYPE Options:**
+  - `LA` = Last Accessed Time
+  - `LM` = Last Modified Time
+  - `FC` = File Created Time
+- **SIGN Options:**
+  - `+` = Older than (files NOT accessed/modified/created in last X minutes)
+  - `-` = Within last (files accessed/modified/created within last X minutes)
+- **MINUTES Range:** 1 - 5,256,000 (1 minute to 10 years)
+- **Examples:**
+  - `"LA:+43200"` = Files NOT accessed in last 43200 minutes (30 days) - archives idle files
+  - `"LA:-1440"` = Files accessed within last 1440 minutes (1 day) - processes recent files
+  - `"LM:+10080"` = Files NOT modified in last 10080 minutes (1 week) - old unchanged files
+  - `"LM:-60"` = Files modified within last 60 minutes (1 hour) - immediate processing
+  - `"FC:+43200"` = Files created more than 43200 minutes ago (30 days) - old files only
+  - `""` or empty = No filter (process all files)
+- **Common Values:** 60 (1 hr) • 1440 (1 day) • 10080 (7 days) • 43200 (30 days)
+- **Validation:** Format must be exactly `TYPE:SIGN:MINUTES` or empty
 
 ✅ **Extension Format:**
 - Must include leading dot (`.pdf` not `pdf`)

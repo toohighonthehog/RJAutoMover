@@ -210,6 +210,89 @@ public class TrayIconService
     }
 
     /// <summary>
+    /// Gets the initial transfer history from the service for display in the About window.
+    /// Requests fresh status from service which includes database history, not just cached data.
+    /// </summary>
+    /// <returns>A list of transfer history strings including database records.</returns>
+    public async Task<List<string>> GetInitialTransferHistoryAsync()
+    {
+        _logger.Log(LogLevel.DEBUG, $"GetInitialTransferHistoryAsync: Cached items={_cachedRecents.Count}");
+
+        try
+        {
+            // Request fresh status from service which includes historical database records
+            _logger.Log(LogLevel.DEBUG, "GetInitialTransferHistoryAsync: Calling GetFullServiceStatusAsync...");
+            var status = await _grpcClient.GetFullServiceStatusAsync();
+
+            if (status == null)
+            {
+                _logger.Log(LogLevel.WARN, "GetInitialTransferHistoryAsync: GetFullServiceStatusAsync returned null");
+                return _cachedRecents.ToList();
+            }
+
+            _logger.Log(LogLevel.DEBUG, $"GetInitialTransferHistoryAsync: Status received - IsRunning={status.IsRunning}, IsPaused={status.IsPaused}, RecentItems.Count={status.RecentItems?.Count ?? 0}");
+
+            if (status.RecentItems != null && status.RecentItems.Count > 0)
+            {
+                _logger.Log(LogLevel.INFO, $"GetInitialTransferHistoryAsync: Retrieved {status.RecentItems.Count} items from service (includes database history)");
+
+                // Log first few items for debugging
+                for (int i = 0; i < Math.Min(3, status.RecentItems.Count); i++)
+                {
+                    _logger.Log(LogLevel.DEBUG, $"  Item {i}: {status.RecentItems[i].Substring(0, Math.Min(100, status.RecentItems[i].Length))}...");
+                }
+
+                // Update cache with fresh data including history
+                _cachedRecents = status.RecentItems.ToList();
+
+                return _cachedRecents;
+            }
+            else
+            {
+                _logger.Log(LogLevel.WARN, "GetInitialTransferHistoryAsync: Service returned no activities (RecentItems is null or empty)");
+                return _cachedRecents.ToList(); // Fall back to cache if service returns nothing
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(LogLevel.ERROR, $"GetInitialTransferHistoryAsync: Error fetching from service: {ex.Message}");
+            _logger.Log(LogLevel.ERROR, $"GetInitialTransferHistoryAsync: Stack trace: {ex.StackTrace}");
+            // Fall back to cached data on error
+            return _cachedRecents.ToList();
+        }
+    }
+
+    /// <summary>
+    /// Gets database statistics from the service via gRPC.
+    /// </summary>
+    public async Task<DatabaseStatistics?> GetDatabaseStatistics()
+    {
+        try
+        {
+            var systemInfo = await _grpcClient.GetServiceSystemInfoAsync();
+
+            // Parse database statistics from system info response
+            var stats = new DatabaseStatistics
+            {
+                DatabasePath = systemInfo.DatabasePath ?? "(unknown)",
+                IsEnabled = systemInfo.DatabaseEnabled,
+                IsConnected = systemInfo.DatabaseConnected,
+                TotalRecords = systemInfo.DatabaseRecordCount,
+                LastTransferTimestamp = !string.IsNullOrEmpty(systemInfo.DatabaseLastTransfer)
+                    ? DateTime.Parse(systemInfo.DatabaseLastTransfer)
+                    : null
+            };
+
+            return stats;
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(LogLevel.ERROR, $"Failed to get database statistics: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Updates the toggle menu item text to reflect the current pause state.
     /// </summary>
     /// <param name="isPaused">True if processing is paused, false if active.</param>

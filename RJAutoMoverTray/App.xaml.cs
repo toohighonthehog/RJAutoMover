@@ -18,6 +18,7 @@ public partial class App : Application
     private GrpcClientServiceV2? _grpcClient;
     private TrayIconService? _trayService;
     private RJAutoMoverShared.Services.LoggingService? _logger;
+    private RJAutoMoverShared.Services.RuntimeStateService? _runtimeState;
     private TrayServerHost? _trayServer;
     private Mutex? _singleInstanceMutex;
     private readonly System.Timers.Timer _memoryTimer;
@@ -30,6 +31,9 @@ public partial class App : Application
 
     // Static property to share log folder with AboutWindow
     public static string? ServiceLogFolder { get; set; }
+
+    // Static property to share runtime state with windows
+    public static RJAutoMoverShared.Services.RuntimeStateService? RuntimeState { get; private set; }
 
     public App()
     {
@@ -113,6 +117,11 @@ public partial class App : Application
         // Auto-startup scheduled task is created during installation if user selected the option
 
         _logger.Log(RJAutoMoverShared.Models.LogLevel.INFO, "RJTray starting...");
+
+        // Initialize runtime state service (for dark mode and other UI preferences)
+        _runtimeState = new RJAutoMoverShared.Services.RuntimeStateService(_logger);
+        RuntimeState = _runtimeState;
+        _logger.Log(RJAutoMoverShared.Models.LogLevel.INFO, $"Runtime state initialized - Dark mode: {_runtimeState.DarkModeEnabled}");
 
         // Start memory monitoring timer with configured values
         _memoryTimer.Interval = _memoryCheckMs;

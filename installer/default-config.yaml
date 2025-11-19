@@ -26,24 +26,20 @@
 #   - IsActive: Enable/disable this rule (true or false)
 #   - FileExists: What to do if file exists in destination (skip or overwrite)
 #
-# Optional Date Criteria (mutually exclusive - only use ONE per rule):
-#   - LastAccessedMins: Filter files by last access time
-#       Range: -5256000 to +5256000 (+/- 10 years, zero not allowed)
-#       Positive = OLDER than X minutes (e.g., 1440 = files accessed MORE than 24 hours ago)
-#       Negative = WITHIN last X minutes (e.g., -60 = files accessed WITHIN last 60 minutes)
-#       Examples: 1440 (older than 24 hours), -60 (within last hour)
-#   - LastModifiedMins: Filter files by last modification time
-#       Range: -5256000 to +5256000 (+/- 10 years, zero not allowed)
-#       Positive = OLDER than X minutes (e.g., 60 = files modified MORE than 60 minutes ago)
-#       Negative = WITHIN last X minutes (e.g., -30 = files modified WITHIN last 30 minutes)
-#       Examples: 60 (older than 1 hour), -30 (within last 30 min)
-#   - AgeCreatedMins: Filter files by creation time
-#       Range: -5256000 to +5256000 (+/- 10 years, zero not allowed)
-#       Positive = OLDER than X minutes (e.g., 10080 = files created MORE than 7 days ago)
-#       Negative = WITHIN last X minutes (e.g., -1440 = files created WITHIN last 24 hours)
-#       Examples: 10080 (older than 7 days), -1440 (within last 24 hours)
-#   IMPORTANT: Only ONE date criteria can be used per rule. If multiple are specified,
-#              validation will fail with an error explaining the conflict.
+# Optional Date Filter (new format - single string):
+#   - DateFilter: Filter files by date/time criteria
+#       Format: "TYPE:SIGN:MINUTES"
+#       TYPE: LA (Last Accessed), LM (Last Modified), FC (File Created)
+#       SIGN: + (older than), - (within last)
+#       MINUTES: 1-5256000 (1 minute to 10 years)
+#       Examples:
+#         "LA:+43200"  = Files NOT accessed in last 43200 minutes (30 days) - older files
+#         "LA:-1440"   = Files accessed within last 1440 minutes (1 day) - recent files
+#         "LM:+10080"  = Files NOT modified in last 10080 minutes (1 week)
+#         "LM:-60"     = Files modified within last 60 minutes (1 hour)
+#         "FC:+43200"  = Files created more than 43200 minutes ago (30 days)
+#         ""           = No filter (process all files)
+#       Common values: 60 (1 hr) • 1440 (1 day) • 10080 (7 days) • 43200 (30 days)
 #
 # Special Variables:
 #   <InstallingUserDownloads> - Downloads folder of user who installed app
@@ -71,7 +67,7 @@ FileRules:
     FileExists: overwrite
 
   # Example Rule 3: Move old log files (older than 7 days) to archive folder
-  # This demonstrates the AgeCreatedMins date criteria with POSITIVE value (older than)
+  # This demonstrates the DateFilter with File Created (FC) and + (older than)
   # - Name: Archive Old Logs
   #   SourceFolder: C:\Logs
   #   Extension: .log|.txt
@@ -79,20 +75,20 @@ FileRules:
   #   ScanIntervalMs: 86400000
   #   IsActive: false
   #   FileExists: skip
-  #   AgeCreatedMins: 10080  # Positive = OLDER than 7 days (7 * 24 * 60 minutes)
+  #   DateFilter: "FC:+10080"  # Files created MORE than 7 days ago
 
-  # Example Rule 4: Catch-all rule using Extension: ALL
-  # This demonstrates an ALL extension rule (lowest priority - processes last)
-  # ALL rules act as a catch-all for any file type not matched by specific rules
-  # IMPORTANT: ALL rules MUST have a date criteria and only one per source folder
+  # Example Rule 4: Catch-all rule using Extension: OTHERS
+  # This demonstrates an OTHERS extension rule (lowest priority - processes last)
+  # OTHERS rules act as a catch-all for any file type not matched by specific rules
+  # IMPORTANT: OTHERS rules MUST have a DateFilter and only one per source folder
   # - Name: Cleanup Old Downloads
   #   SourceFolder: <InstallingUserDownloads>
-  #   Extension: ALL
+  #   Extension: OTHERS
   #   DestinationFolder: <InstallingUserDownloads>\OldFiles
   #   ScanIntervalMs: 3600000
   #   IsActive: false
   #   FileExists: skip
-  #   AgeCreatedMins: 43200  # Positive = OLDER than 30 days (30 * 24 * 60 minutes)
+  #   DateFilter: "FC:+43200"  # Files created MORE than 30 days ago
 
 # ==============================================================================
 # APPLICATION SETTINGS - Control service behavior

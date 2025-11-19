@@ -27,11 +27,22 @@
         <!-- Content -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="20">
+                <!-- Validation Summary -->
+                <Border x:Name="ValidationSummary" Background="#FFF3CD" BorderBrush="#FFC107" BorderThickness="1"
+                        Padding="10" Margin="0,0,0,15" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="⚠ Validation Errors:" FontWeight="Bold" Foreground="#856404" Margin="0,0,0,5"/>
+                        <TextBlock x:Name="ValidationSummaryText" TextWrapping="Wrap" Foreground="#856404" FontSize="11"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- Rule Name -->
                 <TextBlock Text="Rule Name" Style="{StaticResource LabelStyle}"/>
                 <TextBox x:Name="RuleNameTextBox" Style="{StaticResource TextBoxStyle}"
                          Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                         MaxLength="32"/>
+                         MaxLength="32"
+                         TextChanged="RuleNameTextBox_TextChanged"/>
+                <TextBlock x:Name="RuleNameError" FontSize="10" Foreground="Red" Margin="0,2,0,0" Visibility="Collapsed"/>
                 <TextBlock Text="Alphanumeric and spaces only, max 32 characters"
                            FontSize="10" Foreground="#999" Margin="0,2,0,10"/>
 
@@ -74,7 +85,9 @@
                 <!-- Extensions -->
                 <TextBlock Text="File Extensions" Style="{StaticResource LabelStyle}"/>
                 <TextBox x:Name="ExtensionTextBox" Style="{StaticResource TextBoxStyle}"
-                         Text="{Binding Extension, UpdateSourceTrigger=PropertyChanged}"/>
+                         Text="{Binding Extension, UpdateSourceTrigger=PropertyChanged}"
+                         TextChanged="ExtensionTextBox_TextChanged"/>
+                <TextBlock x:Name="ExtensionError" FontSize="10" Foreground="Red" Margin="0,2,0,0" Visibility="Collapsed"/>
                 <TextBlock FontSize="10" Foreground="#999" Margin="0,2,0,5" TextWrapping="Wrap">
                     <Run Text="Use | to separate multiple extensions (e.g., .pdf|.doc|.txt)"/>
                     <LineBreak/>
@@ -91,7 +104,8 @@
                     </Grid.ColumnDefinitions>
                     <TextBox x:Name="ScanIntervalTextBox" Grid.Column="0" Width="100"
                              Text="{Binding ScanIntervalMs, UpdateSourceTrigger=PropertyChanged}"
-                             VerticalContentAlignment="Center" Padding="5" Margin="0"/>
+                             VerticalContentAlignment="Center" Padding="5" Margin="0"
+                             TextChanged="ScanIntervalTextBox_TextChanged"/>
                     <Slider x:Name="ScanIntervalSlider" Grid.Column="1"
                             Minimum="5000" Maximum="900000"
                             Value="{Binding ScanIntervalMs, UpdateSourceTrigger=PropertyChanged}"
@@ -100,6 +114,7 @@
                     <TextBlock x:Name="ScanIntervalLabel" Grid.Column="2"
                                VerticalAlignment="Center" FontSize="11" Foreground="#666"/>
                 </Grid>
+                <TextBlock x:Name="ScanIntervalError" FontSize="10" Foreground="Red" Margin="0,2,0,0" Visibility="Collapsed"/>
                 <TextBlock Text="Range: 5000-900000 ms (5 seconds to 15 minutes)"
                            FontSize="10" Foreground="#999" Margin="0,2,0,10"/>
 
@@ -108,71 +123,107 @@
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,10">
                     <RadioButton x:Name="FileExistsSkipRadio" Content="Skip (leave existing file)"
                                  GroupName="FileExists" Margin="0,0,20,0"
-                                 IsChecked="{Binding FileExistsSkip}"/>
+                                 Checked="FileExistsRadio_Checked"/>
                     <RadioButton x:Name="FileExistsOverwriteRadio" Content="Overwrite (replace existing)"
                                  GroupName="FileExists"
-                                 IsChecked="{Binding FileExistsOverwrite}"/>
+                                 Checked="FileExistsRadio_Checked"/>
                 </StackPanel>
 
                 <!-- Date Filtering -->
                 <TextBlock Text="Date Filtering (Optional)" Style="{StaticResource SectionHeaderStyle}"/>
-                <TextBlock FontSize="11" Foreground="#666" Margin="0,0,0,10" TextWrapping="Wrap">
-                    Only ONE date filter allowed per rule. Leave all unchecked for no date filtering.
-                </TextBlock>
+                <Border Background="#F8F8F8" BorderBrush="#DDDDDD" BorderThickness="1" Padding="15" Margin="0,5,0,10" CornerRadius="4">
+                    <StackPanel>
+                        <TextBlock FontSize="11" Foreground="#666" Margin="0,0,0,10" TextWrapping="Wrap">
+                            Select one date filter type, or choose "None" to process all files regardless of date.
+                        </TextBlock>
 
-                <RadioButton x:Name="NoDateFilterRadio" Content="No date filter" GroupName="DateFilter"
-                             Margin="0,5" IsChecked="True"
-                             Checked="DateFilterRadio_Changed"/>
+                        <!-- No Filter Option -->
+                        <RadioButton x:Name="NoDateFilterRadio" Content="None - Process all files" GroupName="DateFilter"
+                                     Margin="0,5" IsChecked="True" FontWeight="Medium"
+                                     Checked="DateFilterRadio_Changed"/>
 
-                <!-- Last Accessed Filter -->
-                <RadioButton x:Name="LastAccessedRadio" Content="Last Accessed:" GroupName="DateFilter"
-                             Margin="0,5" Checked="DateFilterRadio_Changed"/>
-                <StackPanel Orientation="Horizontal" Margin="25,5,0,5"
-                            IsEnabled="{Binding IsChecked, ElementName=LastAccessedRadio}">
-                    <RadioButton x:Name="LastAccessedOlderRadio" Content="Older than" GroupName="LastAccessedDir"
-                                 Margin="0,0,10,0" IsChecked="True"/>
-                    <RadioButton x:Name="LastAccessedWithinRadio" Content="Within last" GroupName="LastAccessedDir"
-                                 Margin="0,0,10,0"/>
-                    <TextBox x:Name="LastAccessedMinsTextBox" Width="100" Padding="5"
-                             VerticalContentAlignment="Center"/>
-                    <TextBlock Text="minutes" VerticalAlignment="Center" Margin="10,0"/>
-                </StackPanel>
+                        <Separator Margin="0,10" Background="#DDDDDD"/>
 
-                <!-- Last Modified Filter -->
-                <RadioButton x:Name="LastModifiedRadio" Content="Last Modified:" GroupName="DateFilter"
-                             Margin="0,5" Checked="DateFilterRadio_Changed"/>
-                <StackPanel Orientation="Horizontal" Margin="25,5,0,5"
-                            IsEnabled="{Binding IsChecked, ElementName=LastModifiedRadio}">
-                    <RadioButton x:Name="LastModifiedOlderRadio" Content="Older than" GroupName="LastModifiedDir"
-                                 Margin="0,0,10,0" IsChecked="True"/>
-                    <RadioButton x:Name="LastModifiedWithinRadio" Content="Within last" GroupName="LastModifiedDir"
-                                 Margin="0,0,10,0"/>
-                    <TextBox x:Name="LastModifiedMinsTextBox" Width="100" Padding="5"
-                             VerticalContentAlignment="Center"/>
-                    <TextBlock Text="minutes" VerticalAlignment="Center" Margin="10,0"/>
-                </StackPanel>
+                        <!-- Filter Type Selection Grid -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
 
-                <!-- Age Created Filter -->
-                <RadioButton x:Name="AgeCreatedRadio" Content="Age (Created):" GroupName="DateFilter"
-                             Margin="0,5" Checked="DateFilterRadio_Changed"/>
-                <StackPanel Orientation="Horizontal" Margin="25,5,0,10"
-                            IsEnabled="{Binding IsChecked, ElementName=AgeCreatedRadio}">
-                    <RadioButton x:Name="AgeCreatedOlderRadio" Content="Older than" GroupName="AgeCreatedDir"
-                                 Margin="0,0,10,0" IsChecked="True"/>
-                    <RadioButton x:Name="AgeCreatedWithinRadio" Content="Within last" GroupName="AgeCreatedDir"
-                                 Margin="0,0,10,0"/>
-                    <TextBox x:Name="AgeCreatedMinsTextBox" Width="100" Padding="5"
-                             VerticalContentAlignment="Center"/>
-                    <TextBlock Text="minutes" VerticalAlignment="Center" Margin="10,0"/>
-                </StackPanel>
+                            <!-- Last Accessed Filter -->
+                            <RadioButton x:Name="LastAccessedRadio" Content="Last Accessed Time" GroupName="DateFilter"
+                                         Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" FontWeight="Medium"
+                                         Margin="0,5" Checked="DateFilterRadio_Changed"/>
+                            <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="1" Margin="10,5,0,5"
+                                        IsEnabled="{Binding IsChecked, ElementName=LastAccessedRadio}">
+                                <TextBlock Text="Files" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <ComboBox x:Name="LastAccessedDirection" Width="100" SelectedIndex="0"
+                                          SelectionChanged="DateFilterComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="older than"/>
+                                    <ComboBoxItem Content="within last"/>
+                                </ComboBox>
+                                <TextBox x:Name="LastAccessedMinsTextBox" Width="80" Padding="5" Margin="5,0"
+                                         VerticalContentAlignment="Center"
+                                         TextChanged="DateFilterTextBox_TextChanged"/>
+                                <TextBlock Text="minutes" VerticalAlignment="Center"/>
+                            </StackPanel>
 
-                <TextBlock FontSize="10" Foreground="#999" Margin="0,0,0,10" TextWrapping="Wrap">
-                    <Run Text="Common values: 60 (1 hr), 1440 (1 day), 10080 (7 days), 43200 (30 days)"/>
-                    <LineBreak/>
-                    <Run Text="Range: 1-5256000 minutes (1 min to 10 years)"/>
-                    <LineBreak/>
-                    <Run Text="Note: OTHERS extension rules MUST have a date filter"/>
-                </TextBlock>
+                            <!-- Last Modified Filter -->
+                            <RadioButton x:Name="LastModifiedRadio" Content="Last Modified Time" GroupName="DateFilter"
+                                         Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontWeight="Medium"
+                                         Margin="0,5" Checked="DateFilterRadio_Changed"/>
+                            <StackPanel Orientation="Horizontal" Grid.Row="1" Grid.Column="1" Margin="10,5,0,5"
+                                        IsEnabled="{Binding IsChecked, ElementName=LastModifiedRadio}">
+                                <TextBlock Text="Files" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <ComboBox x:Name="LastModifiedDirection" Width="100" SelectedIndex="0"
+                                          SelectionChanged="DateFilterComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="older than"/>
+                                    <ComboBoxItem Content="within last"/>
+                                </ComboBox>
+                                <TextBox x:Name="LastModifiedMinsTextBox" Width="80" Padding="5" Margin="5,0"
+                                         VerticalContentAlignment="Center"
+                                         TextChanged="DateFilterTextBox_TextChanged"/>
+                                <TextBlock Text="minutes" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- File Created Filter -->
+                            <RadioButton x:Name="AgeCreatedRadio" Content="File Created Time" GroupName="DateFilter"
+                                         Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" FontWeight="Medium"
+                                         Margin="0,5" Checked="DateFilterRadio_Changed"/>
+                            <StackPanel Orientation="Horizontal" Grid.Row="2" Grid.Column="1" Margin="10,5,0,5"
+                                        IsEnabled="{Binding IsChecked, ElementName=AgeCreatedRadio}">
+                                <TextBlock Text="Files" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <ComboBox x:Name="AgeCreatedDirection" Width="100" SelectedIndex="0"
+                                          SelectionChanged="DateFilterComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="older than"/>
+                                    <ComboBoxItem Content="within last"/>
+                                </ComboBox>
+                                <TextBox x:Name="AgeCreatedMinsTextBox" Width="80" Padding="5" Margin="5,0"
+                                         VerticalContentAlignment="Center"
+                                         TextChanged="DateFilterTextBox_TextChanged"/>
+                                <TextBlock Text="minutes" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock x:Name="DateFilterError" FontSize="10" Foreground="Red" Margin="0,10,0,0" Visibility="Collapsed"/>
+
+                        <Separator Margin="0,10" Background="#DDDDDD"/>
+
+                        <TextBlock FontSize="10" Foreground="#666" TextWrapping="Wrap" Margin="0,0,0,5">
+                            <Run Text="💡 Common values: 60 (1 hr) • 1440 (1 day) • 10080 (7 days) • 43200 (30 days)"/>
+                        </TextBlock>
+
+                        <TextBlock FontSize="9" Foreground="#999" TextWrapping="Wrap" FontFamily="Consolas">
+                            <Run Text="Format saved to config: TYPE:SIGN:MINUTES (e.g., LA:+43200, LM:-1440, FC:+10080)"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
 
                 <!-- Rule Active -->
                 <CheckBox x:Name="IsActiveCheckBox" Content="Rule is Active" FontWeight="Bold" FontSize="13"
@@ -183,7 +234,7 @@
         <!-- Buttons -->
         <Border Grid.Row="2" Background="White" Padding="15" BorderBrush="#DDDDDD" BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Save" Style="{StaticResource ButtonStyle}"
+                <Button Content="Commit" Style="{StaticResource ButtonStyle}"
                         Click="SaveButton_Click" Padding="20,8" MinWidth="100"/>
                 <Button Content="Cancel" Style="{StaticResource ButtonStyle}"
                         Click="CancelButton_Click" Padding="20,8" MinWidth="100" Background="#999999"/>

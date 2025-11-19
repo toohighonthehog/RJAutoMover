@@ -9,6 +9,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using RJAutoMoverConfig.Services;
 using RJAutoMoverConfig.Windows;
@@ -19,6 +20,7 @@ namespace RJAutoMoverConfig;
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
     private readonly ConfigEditorService _configService;
+    private readonly DispatcherTimer _validationTimer;
     private string _configFilePath;
     private bool _isConfigValid;
     private bool _hasUnsavedChanges;
@@ -39,14 +41,56 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         FileRules = new ObservableCollection<FileRule>();
         ApplicationSettings = new ApplicationConfig();
 
+        // Initialize debounced validation timer (1.5 second delay)
+        _validationTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1.5)
+        };
+        _validationTimer.Tick += async (s, e) =>
+        {
+            _validationTimer.Stop();
+            await ValidateConfiguration(showMessageBox: false);
+        };
+
         // Load app icon
         LoadAppIcon();
 
         // Check admin status
         IsAdministrator = ConfigEditorService.IsRunningAsAdministrator();
 
+        // Add keyboard shortcuts
+        PreviewKeyDown += MainWindow_PreviewKeyDown;
+
         // Load default config asynchronously after window loads
         Loaded += async (s, e) => await TryLoadDefaultConfig();
+    }
+
+    /// <summary>
+    /// Handle keyboard shortcuts
+    /// </summary>
+    private async void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        // Ctrl+S = Save
+        if (e.Key == Key.S && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            e.Handled = true;
+            if (CanSave)
+            {
+                await SaveConfiguration();
+            }
+        }
+        // Ctrl+O = Open
+        else if (e.Key == Key.O && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            e.Handled = true;
+            LoadButton_Click(this, new RoutedEventArgs());
+        }
+        // F5 = Validate
+        else if (e.Key == Key.F5)
+        {
+            e.Handled = true;
+            await ValidateConfiguration();
+        }
     }
 
     #region Properties
@@ -80,10 +124,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _hasUnsavedChanges = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(CanSave));
+
+            // Trigger debounced auto-validation when changes are made
+            if (value)
+            {
+                TriggerDebouncedValidation();
+            }
         }
     }
 
-    public bool CanSave => IsConfigValid && HasUnsavedChanges;
+    // Allow saving even if validation hasn't been run yet - we'll auto-validate on save
+    public bool CanSave => HasUnsavedChanges;
 
     public bool IsAdministrator { get; }
 
@@ -224,9 +275,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 ScanIntervalMs = rule.ScanIntervalMs,
                 FileExists = rule.FileExists,
                 IsActive = false, // Start as inactive for safety
-                LastAccessedMins = rule.LastAccessedMins,
-                LastModifiedMins = rule.LastModifiedMins,
-                AgeCreatedMins = rule.AgeCreatedMins
+                DateFilter = rule.DateFilter
             };
 
             FileRules.Add(duplicatedRule);
@@ -420,6 +469,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             // Automatically validate the loaded configuration (without showing message boxes)
             await ValidateConfiguration(showMessageBox: false);
+
+            // Show validation result after load
+            if (IsConfigValid)
+            {
+                UpdateValidationStatus($"Configuration loaded successfully from {Path.GetFileName(ConfigFilePath)}", true);
+            }
+            else
+            {
+                UpdateValidationStatus($"Configuration loaded but has validation errors - see status for details", false);
+            }
         }
         catch (Exception ex)
         {
@@ -429,6 +488,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+    }
+
+    /// <summary>
+    /// Triggers debounced auto-validation (restarts timer if already running)
+    /// </summary>
+    private void TriggerDebouncedValidation()
+    {
+        _validationTimer.Stop();
+        _validationTimer.Start();
     }
 
     /// <summary>
@@ -498,13 +566,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         try
         {
-            // Validate first if not already validated
+            // Auto-validate before saving
+            await ValidateConfiguration(showMessageBox: false);
+
             if (!IsConfigValid)
             {
-                await ValidateConfiguration();
-                if (!IsConfigValid)
+                // Show validation errors and ask if user wants to save anyway
+                var result = MessageBox.Show(
+                    $"Configuration validation failed:\n\n{ValidationStatusText.Text}\n\nDo you want to save anyway?\n\n" +
+                    "WARNING: The service will not be able to load an invalid configuration.",
+                    "Validation Failed",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (result != MessageBoxResult.Yes)
                 {
-                    return; // Validation failed
+                    return; // User chose not to save
                 }
             }
 
@@ -775,6 +852,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+    }
+
+    /// <summary>
+    /// Event handler for when IsActive checkbox value is updated by user (source updated)
+    /// </summary>
+    private void IsActiveCheckBox_SourceUpdated(object sender, DataTransferEventArgs e)
+    {
+        // This fires when the user clicks the checkbox and the source (FileRule.IsActive) is updated
+        // Mark configuration as modified
+        IsConfigValid = false;
+        HasUnsavedChanges = true;
+        UpdateValidationStatus("Configuration modified - validation required", false);
     }
 
     #endregion

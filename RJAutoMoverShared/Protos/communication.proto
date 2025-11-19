@@ -157,4 +157,9 @@ message ServiceSystemInfoResponse {
   int64 peakMemoryUsageBytes = 2;
   int64 startTimeUnixMs = 3;
   int64 uptimeMs = 4;
+  string databasePath = 5;
+  bool databaseEnabled = 6;
+  bool databaseConnected = 7;
+  int32 databaseRecordCount = 8;
+  string databaseLastTransfer = 9;
 }

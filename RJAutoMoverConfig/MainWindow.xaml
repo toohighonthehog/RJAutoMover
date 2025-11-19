@@ -182,8 +182,9 @@
 
                                             <!-- Line 1: Active checkbox, Name, Extensions -->
                                             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,2,0,0">
-                                                <CheckBox IsChecked="{Binding IsActive, UpdateSourceTrigger=PropertyChanged}"
-                                                          VerticalAlignment="Center" Margin="0,0,6,0" ToolTip="Active"/>
+                                                <CheckBox IsChecked="{Binding IsActive, UpdateSourceTrigger=PropertyChanged, NotifyOnSourceUpdated=True}"
+                                                          VerticalAlignment="Center" Margin="0,0,6,0" ToolTip="Active"
+                                                          SourceUpdated="IsActiveCheckBox_SourceUpdated"/>
                                                 <TextBlock Text="{Binding Name}" FontSize="10.5" Margin="0,0,8,0" VerticalAlignment="Center">
                                                     <TextBlock.Style>
                                                         <Style TargetType="TextBlock">

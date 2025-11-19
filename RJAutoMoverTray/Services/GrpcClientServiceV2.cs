@@ -122,6 +122,19 @@ public class GrpcClientServiceV2 : IDisposable
         }
     }
 
+    public async Task<ServiceStatusResponse?> GetFullServiceStatusAsync()
+    {
+        try
+        {
+            return await _client.GetFullServiceStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(LogLevel.ERROR, $"Failed to get full service status: {ex.Message}");
+            return null;
+        }
+    }
+
     public async Task<bool> ClearRecentActivitiesAsync()
     {
         try

@@ -77,7 +77,7 @@ Each active FileRule operates independently with its own timer:
 
 1. **Timer fires** every `ScanIntervalMs` milliseconds
 2. **Scan** `SourceFolder` for files matching `Extension` (case-insensitive)
-3. **Filter** by optional date criteria: `LastAccessedMins`, `LastModifiedMins`, or `AgeCreatedMins` (mutually exclusive)
+3. **Filter** by optional `DateFilter` (e.g., "LA:+43200" = files not accessed in last 43200 minutes)
 4. **Check** if file exists in `DestinationFolder` based on `FileExists` setting (skip/overwrite)
 5. **Move** file (copy then delete) from source to destination
 6. **Record** in activity history database
@@ -130,14 +130,28 @@ The Windows service runs under a configured service account (default: Local Syst
 
 ## Date Filtering Logic
 
-FileRules support optional date criteria (only ONE per rule):
+FileRules support an optional `DateFilter` property with format: `"TYPE:SIGN:MINUTES"`
 
-- **LastAccessedMins**: Filter by last access time (positive=older than X mins, negative=within last X mins)
-- **LastModifiedMins**: Filter by last modification time (positive=older than X mins, negative=within last X mins)
-- **AgeCreatedMins**: Filter by creation time (positive=older than X mins, negative=within last X mins)
-- **Range**: -5256000 to +5256000 minutes (±10 years, zero not allowed)
-- **Mutual exclusivity**: Validation fails if multiple date criteria are specified
-- **Extension "ALL"**: Catch-all rules that match any file type MUST have a date criteria
+**Format Components:**
+- **TYPE**: `LA` (Last Accessed), `LM` (Last Modified), `FC` (File Created)
+- **SIGN**: `+` (older than), `-` (within last)
+- **MINUTES**: Integer value (1-5256000, representing up to 10 years)
+
+**Examples:**
+- `"LA:+43200"` = Files NOT accessed in last 43200 minutes (30 days) - older files
+- `"LA:-1440"` = Files accessed within last 1440 minutes (1 day) - recent files
+- `"LM:+10080"` = Files NOT modified in last 10080 minutes (1 week)
+- `"FC:+43200"` = Files created more than 43200 minutes ago
+- `""` or empty = No date filter (process all files)
+
+**Important Rules:**
+- **Single filter**: Only one DateFilter per rule (format prevents conflicts)
+- **Extension "OTHERS"**: Catch-all rules that match any file type MUST have a DateFilter
+- **Validation**: Format is validated by [DateFilterHelper.cs](RJAutoMoverShared/Helpers/DateFilterHelper.cs)
+
+**Legacy Format (Deprecated):**
+- Old properties `LastAccessedMins`, `LastModifiedMins`, `AgeCreatedMins` are deprecated
+- Use `DateFilterHelper.MigrateFromLegacyFormat()` to convert old configs
 
 See [TEST_PLAN_DATE_FILTERING.md](TEST_PLAN_DATE_FILTERING.md) for detailed testing scenarios.
 

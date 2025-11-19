@@ -13,21 +13,41 @@ public class FileRule
     public string FileExists { get; set; } = "skip";
 
     /// <summary>
-    /// Optional: Only move files that were last accessed within the specified number of minutes.
-    /// Must be positive. Maximum: 5256000 minutes (10 years). Mutually exclusive with LastModifiedMins and AgeCreatedMins.
+    /// Date filter specification in format: "TYPE:SIGN:MINUTES"
+    /// - TYPE: LA (Last Accessed), LM (Last Modified), FC (File Created)
+    /// - SIGN: + (older than), - (within last)
+    /// - MINUTES: Integer value (1-5256000, representing up to 10 years)
+    ///
+    /// Examples:
+    /// - "LA:+43200" = Files NOT accessed in last 43200 minutes (older files)
+    /// - "LA:-1440" = Files accessed within last 1440 minutes (recent files)
+    /// - "LM:+10080" = Files NOT modified in last 10080 minutes
+    /// - "FC:+43200" = Files created more than 43200 minutes ago
+    /// - "" or null = No date filter (process all files)
+    ///
+    /// This replaces the deprecated LastAccessedMins, LastModifiedMins, and AgeCreatedMins properties.
     /// </summary>
+    public string DateFilter { get; set; } = string.Empty;
+
+    /// <summary>
+    /// DEPRECATED: Use DateFilter property instead. Kept for backward compatibility with old config files.
+    /// </summary>
+    [YamlIgnore]
+    [Obsolete("Use DateFilter property instead")]
     public int? LastAccessedMins { get; set; } = null;
 
     /// <summary>
-    /// Optional: Only move files that were last modified within the specified number of minutes.
-    /// Must be positive. Maximum: 5256000 minutes (10 years). Mutually exclusive with LastAccessedMins and AgeCreatedMins.
+    /// DEPRECATED: Use DateFilter property instead. Kept for backward compatibility with old config files.
     /// </summary>
+    [YamlIgnore]
+    [Obsolete("Use DateFilter property instead")]
     public int? LastModifiedMins { get; set; } = null;
 
     /// <summary>
-    /// Optional: Only move files that are older than the specified number of minutes (created at least X minutes ago).
-    /// Must be positive. Maximum: 5256000 minutes (10 years). Mutually exclusive with LastAccessedMins and LastModifiedMins.
+    /// DEPRECATED: Use DateFilter property instead. Kept for backward compatibility with old config files.
     /// </summary>
+    [YamlIgnore]
+    [Obsolete("Use DateFilter property instead")]
     public int? AgeCreatedMins { get; set; } = null;
 
     public List<string> GetExtensions()
@@ -60,43 +80,13 @@ public class FileRule
     /// Helper property to check if rule has a date filter
     /// </summary>
     [YamlIgnore]
-    public bool HasDateFilter => LastAccessedMins.HasValue || LastModifiedMins.HasValue || AgeCreatedMins.HasValue;
+    public bool HasDateFilter => !string.IsNullOrWhiteSpace(DateFilter);
 
     /// <summary>
     /// Helper property to describe the date filter in human-readable format
     /// </summary>
     [YamlIgnore]
-    public string DateFilterDescription
-    {
-        get
-        {
-            if (LastAccessedMins.HasValue)
-            {
-                if (LastAccessedMins.Value > 0)
-                    return $"Files NOT accessed in the last {FormatMinutesToReadable(LastAccessedMins.Value)} (older files)";
-                else
-                    return $"Files accessed within the last {FormatMinutesToReadable(Math.Abs(LastAccessedMins.Value))}";
-            }
-
-            if (LastModifiedMins.HasValue)
-            {
-                if (LastModifiedMins.Value > 0)
-                    return $"Files NOT modified in the last {FormatMinutesToReadable(LastModifiedMins.Value)} (older files)";
-                else
-                    return $"Files modified within the last {FormatMinutesToReadable(Math.Abs(LastModifiedMins.Value))}";
-            }
-
-            if (AgeCreatedMins.HasValue)
-            {
-                if (AgeCreatedMins.Value > 0)
-                    return $"Files created more than {FormatMinutesToReadable(AgeCreatedMins.Value)} ago (older files)";
-                else
-                    return $"Files created within the last {FormatMinutesToReadable(Math.Abs(AgeCreatedMins.Value))}";
-            }
-
-            return "None";
-        }
-    }
+    public string DateFilterDescription => Helpers.DateFilterHelper.GetDescription(DateFilter);
 
     /// <summary>
     /// Alias for DateFilterDescription (for backward compatibility with Tray UI)

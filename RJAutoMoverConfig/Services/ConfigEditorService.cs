@@ -229,51 +229,22 @@ public class ConfigEditorService
                 };
             }
 
-            // Validate date criteria mutual exclusivity
-            var dateCriteriaCount = 0;
-            if (rule.LastAccessedMins.HasValue) dateCriteriaCount++;
-            if (rule.LastModifiedMins.HasValue) dateCriteriaCount++;
-            if (rule.AgeCreatedMins.HasValue) dateCriteriaCount++;
-
-            if (dateCriteriaCount > 1)
+            // Validate DateFilter if present
+            if (!string.IsNullOrWhiteSpace(rule.DateFilter))
             {
-                return new ValidationResult
+                var (isValid, errorMessage) = DateFilterHelper.Validate(rule.DateFilter);
+                if (!isValid)
                 {
-                    IsValid = false,
-                    ErrorMessage = $"Rule '{rule.Name}': Only one date criteria allowed (LastAccessedMins, LastModifiedMins, or AgeCreatedMins)"
-                };
-            }
-
-            // Validate zero values
-            if (rule.LastAccessedMins.HasValue && rule.LastAccessedMins.Value == 0)
-            {
-                return new ValidationResult
-                {
-                    IsValid = false,
-                    ErrorMessage = $"Rule '{rule.Name}': LastAccessedMins cannot be zero"
-                };
-            }
-
-            if (rule.LastModifiedMins.HasValue && rule.LastModifiedMins.Value == 0)
-            {
-                return new ValidationResult
-                {
-                    IsValid = false,
-                    ErrorMessage = $"Rule '{rule.Name}': LastModifiedMins cannot be zero"
-                };
-            }
-
-            if (rule.AgeCreatedMins.HasValue && rule.AgeCreatedMins.Value == 0)
-            {
-                return new ValidationResult
-                {
-                    IsValid = false,
-                    ErrorMessage = $"Rule '{rule.Name}': AgeCreatedMins cannot be zero"
-                };
+                    return new ValidationResult
+                    {
+                        IsValid = false,
+                        ErrorMessage = $"Rule '{rule.Name}': {errorMessage}"
+                    };
+                }
             }
 
             // Validate OTHERS rules have date criteria
-            if (rule.IsAllExtensionRule() && dateCriteriaCount == 0)
+            if (rule.IsAllExtensionRule() && !rule.HasDateFilter)
             {
                 return new ValidationResult
                 {

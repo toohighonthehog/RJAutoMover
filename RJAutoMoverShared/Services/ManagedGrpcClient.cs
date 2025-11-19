@@ -642,6 +642,19 @@ public class ManagedServiceClient : ManagedGrpcClient<TrayService.TrayServiceCli
         return (status.IsRunning, status.IsPaused);
     }
 
+    public async Task<ServiceStatusResponse> GetFullServiceStatusAsync()
+    {
+        Logger($"[gRPC>] GetFullServiceStatus");
+
+        var status = await ExecuteCallAsync(
+            client => client.GetServiceStatusAsync(new Empty()).ResponseAsync,
+            new ServiceStatusResponse(),
+            "GetFullServiceStatus");
+
+        Logger($"[gRPC<] GetFullServiceStatus response: isRunning={status.IsRunning}, isPaused={status.IsPaused}, recentItems={status.RecentItems.Count}");
+        return status;
+    }
+
     public async Task<bool> ClearRecentActivitiesAsync()
     {
         Logger($"[gRPC>] ClearRecentActivities");

@@ -666,6 +666,50 @@ public class ActivityHistoryService : IDisposable
     }
 
     /// <summary>
+    /// Gets database statistics including path, status, total records, and last transfer timestamp
+    /// </summary>
+    public DatabaseStatistics GetDatabaseStatistics()
+    {
+        var stats = new DatabaseStatistics
+        {
+            DatabasePath = _databasePath,
+            IsEnabled = _enabled,
+            IsConnected = _connection != null && _connection.State == System.Data.ConnectionState.Open,
+            TotalRecords = 0,
+            LastTransferTimestamp = null
+        };
+
+        if (!_enabled || _connection == null)
+        {
+            return stats;
+        }
+
+        try
+        {
+            // Get total record count
+            using var countCmd = _connection.CreateCommand();
+            countCmd.CommandText = "SELECT COUNT(*) FROM Activities;";
+            stats.TotalRecords = Convert.ToInt32(countCmd.ExecuteScalar());
+
+            // Get last transfer timestamp
+            using var lastCmd = _connection.CreateCommand();
+            lastCmd.CommandText = "SELECT Timestamp FROM Activities ORDER BY Id DESC LIMIT 1;";
+            var lastTimestamp = lastCmd.ExecuteScalar();
+            if (lastTimestamp != null && lastTimestamp != DBNull.Value)
+            {
+                stats.LastTransferTimestamp = DateTime.Parse(lastTimestamp.ToString()!);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(LogLevel.WARN, $"Failed to get database statistics: {ex.Message}");
+            stats.ErrorMessage = ex.Message;
+        }
+
+        return stats;
+    }
+
+    /// <summary>
     /// Finds and cleans up orphaned transfers that are still marked as "InProgress" from previous sessions.
     /// These are transfers that were interrupted (e.g., service crash, power loss) and never completed.
     /// Returns the number of orphaned transfers found and cleaned up.
@@ -884,4 +928,17 @@ public class ActivityRecord
         if (bytes < 1024 * 1024 * 1024) return $"{bytes / (1024 * 1024)}MB";
         return $"{bytes / (1024 * 1024 * 1024)}GB";
     }
+}
+
+/// <summary>
+/// Database statistics information
+/// </summary>
+public class DatabaseStatistics
+{
+    public string DatabasePath { get; set; } = string.Empty;
+    public bool IsEnabled { get; set; }
+    public bool IsConnected { get; set; }
+    public int TotalRecords { get; set; }
+    public DateTime? LastTransferTimestamp { get; set; }
+    public string? ErrorMessage { get; set; }
 }

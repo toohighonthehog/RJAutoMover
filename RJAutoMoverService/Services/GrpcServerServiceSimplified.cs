@@ -72,6 +72,25 @@ public class GrpcServerServiceSimplified : TrayService.TrayServiceBase
         _fileProcessor.IconUpdated += OnIconUpdated;
         _fileProcessor.RecentsUpdated += OnRecentsUpdated;
         _fileProcessor.FileCountUpdated += OnFileCountUpdated;
+
+        // NOTE: Don't load historical data here - ActivityHistoryService isn't initialized yet!
+        // It will be loaded via RefreshHistoricalCache() after ActivityHistoryService is ready
+    }
+
+    /// <summary>
+    /// Refreshes the recent items cache with historical data from the database.
+    /// Should be called after ActivityHistoryService is fully initialized.
+    /// </summary>
+    public void RefreshHistoricalCache()
+    {
+        if (_fileProcessor == null)
+        {
+            _logger.Log(LogLevel.WARN, "Cannot refresh historical cache - file processor not initialized");
+            return;
+        }
+
+        _recentItems = _fileProcessor.GetActivitiesWithHistory(1000);
+        _logger.Log(LogLevel.INFO, $"Refreshed recent items cache with {_recentItems.Count} activities (including database history)");
     }
 
     public override Task<RegisterResponse> RegisterTray(RegisterRequest request, ServerCallContext context)
@@ -382,14 +401,26 @@ public class GrpcServerServiceSimplified : TrayService.TrayServiceBase
             var startTimeUnixMs = new DateTimeOffset(currentProcess.StartTime).ToUnixTimeMilliseconds();
             var uptimeMs = (long)(DateTime.Now - currentProcess.StartTime).TotalMilliseconds;
 
-            _logger.Log(LogLevel.gRPCOut, $"GetServiceSystemInfo response: memory={memoryUsageBytes / 1024.0 / 1024.0:F2}MB, uptime={uptimeMs}ms");
+            // Get database statistics from file processor's activity history service
+            DatabaseStatistics? dbStats = null;
+            if (_fileProcessor?.ActivityHistory != null)
+            {
+                dbStats = _fileProcessor.ActivityHistory.GetDatabaseStatistics();
+            }
+
+            _logger.Log(LogLevel.gRPCOut, $"GetServiceSystemInfo response: memory={memoryUsageBytes / 1024.0 / 1024.0:F2}MB, uptime={uptimeMs}ms, dbRecords={dbStats?.TotalRecords ?? 0}");
 
             return Task.FromResult(new ServiceSystemInfoResponse
             {
                 MemoryUsageBytes = memoryUsageBytes,
                 PeakMemoryUsageBytes = peakMemoryUsageBytes,
                 StartTimeUnixMs = startTimeUnixMs,
-                UptimeMs = uptimeMs
+                UptimeMs = uptimeMs,
+                DatabasePath = dbStats?.DatabasePath ?? "",
+                DatabaseEnabled = dbStats?.IsEnabled ?? false,
+                DatabaseConnected = dbStats?.IsConnected ?? false,
+                DatabaseRecordCount = dbStats?.TotalRecords ?? 0,
+                DatabaseLastTransfer = dbStats?.LastTransferTimestamp?.ToString("o") ?? ""
             });
         }
         catch (Exception ex)
@@ -401,7 +432,12 @@ public class GrpcServerServiceSimplified : TrayService.TrayServiceBase
                 MemoryUsageBytes = 0,
                 PeakMemoryUsageBytes = 0,
                 StartTimeUnixMs = 0,
-                UptimeMs = 0
+                UptimeMs = 0,
+                DatabasePath = "",
+                DatabaseEnabled = false,
+                DatabaseConnected = false,
+                DatabaseRecordCount = 0,
+                DatabaseLastTransfer = ""
             });
         }
     }

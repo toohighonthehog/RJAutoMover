@@ -39,8 +39,13 @@ public partial class AboutWindow : Window
     private System.Windows.Threading.DispatcherTimer? _transfersAnimationTimer;
     private readonly string[] _brailleFrames = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" };
     private System.Collections.ObjectModel.ObservableCollection<TransferDisplayItem> _transfers = new();
+    private List<TransferDisplayItem> _allTransfers = new(); // Source data for filtering/sorting
     private bool _isProcessingPaused = false;
     private DateTime _serviceStartTime = DateTime.MinValue;
+    private string _currentSortColumn = "Time";
+    private bool _sortAscending = false;
+    private string _transfersSearchText = "";
+    private string _selectedSessionFilter = "All";
 
     // Version checking timer
     private System.Windows.Threading.DispatcherTimer? _versionCheckTimer;
@@ -53,70 +58,248 @@ public partial class AboutWindow : Window
     /// <param name="initialTab">Optional name of tab to open (e.g., "Transfers"). Defaults to "Version" if null.</param>
     public AboutWindow(string? errorStatus = null, bool hasError = false, string? initialTab = null)
     {
-        _errorStatus = errorStatus;
-        _hasError = hasError;
-        _initialTab = initialTab;
-
-        InitializeComponent();
-        LoadAboutInformation();
-        LoadLogs(); // Load logs initially
-
-        var trayService = App.Current.Properties["TrayIconService"] as Services.TrayIconService;
-        _trayIconService = trayService;
-        UpdateHeaderColor(trayService?.GetCurrentIconName());
-
-        // Set up the transfers tab
-        TransfersItemsControl.ItemsSource = _transfers;
-
-        // Setup animation timer for transfers
-        _transfersAnimationTimer = new System.Windows.Threading.DispatcherTimer
+        try
         {
-            Interval = TimeSpan.FromMilliseconds(400)
-        };
-        _transfersAnimationTimer.Tick += TransfersAnimationTimer_Tick;
-        _transfersAnimationTimer.Start();
+            _errorStatus = errorStatus;
+            _hasError = hasError;
+            _initialTab = initialTab;
 
-        // Setup periodic version check timer (refresh every minute)
-        _versionCheckTimer = new System.Windows.Threading.DispatcherTimer
-        {
-            Interval = TimeSpan.FromMinutes(1)
-        };
-        _versionCheckTimer.Tick += async (s, e) => await RefreshVersionTab();
-        _versionCheckTimer.Start();
+            InitializeComponent();
+            LoadAboutInformation();
+            LoadLogs(); // Load logs initially
 
-        // Show error tab if in error state
-        if (_hasError && ErrorTab != null)
-        {
-            ErrorTab.Visibility = Visibility.Visible;
-            TabControl.SelectedItem = ErrorTab;
-            LoadErrorInformation();
+            var trayService = App.Current.Properties["TrayIconService"] as Services.TrayIconService;
+            _trayIconService = trayService;
+            UpdateHeaderColor(trayService?.GetCurrentIconName());
+
+            // Set up the transfers tab
+            TransfersItemsControl.ItemsSource = _transfers;
+
+            // Set database path display
+            var databasePath = System.IO.Path.Combine(
+                RJAutoMoverShared.Constants.Paths.GetSharedDataFolder(),
+                "ActivityHistory.db");
+            if (DatabasePathText != null)
+            {
+                DatabasePathText.Text = $"Activity history database: {databasePath}";
+            }
+
+            // Setup animation timer for transfers
+            _transfersAnimationTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(400)
+            };
+            _transfersAnimationTimer.Tick += TransfersAnimationTimer_Tick;
+            _transfersAnimationTimer.Start();
+
+            // Apply initial theme based on runtime state
+            ApplyTheme(App.RuntimeState?.DarkModeEnabled ?? false);
+
+            // Setup periodic version check timer (refresh every minute)
+            _versionCheckTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMinutes(1)
+            };
+            _versionCheckTimer.Tick += async (s, e) => await RefreshVersionTab();
+            _versionCheckTimer.Start();
+
+            // Show error tab if in error state
+            if (_hasError && ErrorTab != null)
+            {
+                ErrorTab.Visibility = Visibility.Visible;
+                TabControl.SelectedItem = ErrorTab;
+                LoadErrorInformation();
+            }
+            else if (ErrorTab != null)
+            {
+                ErrorTab.Visibility = Visibility.Collapsed;
+            }
+
+            // Select initial tab if specified, otherwise default to Version tab
+            if (!string.IsNullOrEmpty(_initialTab))
+            {
+                SelectTabByName(_initialTab);
+            }
+            else if (!_hasError)
+            {
+                // Default to Version tab when opening normally (not from error state)
+                SelectTabByName("Version");
+            }
+
+            // Subscribe to icon changes
+            if (trayService != null)
+            {
+                trayService.IconChanged += (s, iconName) => UpdateHeaderColor(iconName);
+                // Subscribe to connection state changes to refresh config when service reconnects
+                trayService.ConnectionStateChanged += OnServiceConnectionStateChanged;
+            }
+
+            // Subscribe to tab changes to refresh Version tab when opened
+            TabControl.SelectionChanged += TabControl_SelectionChanged;
+
+            // Load initial transfer history after window content is rendered
+            // NOTE: Service start time is loaded in SetGrpcClient() which is called BEFORE this event
+            if (trayService != null)
+            {
+                this.ContentRendered += async (s, e) =>
+                {
+                    await LoadInitialTransferHistory(trayService);
+                };
+            }
         }
-        else if (ErrorTab != null)
+        catch (Exception ex)
         {
-            ErrorTab.Visibility = Visibility.Collapsed;
+            MessageBox.Show($"Error initializing About window: {ex.Message}\n\nStack trace:\n{ex.StackTrace}",
+                "About Window Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            throw; // Re-throw to prevent window from opening in bad state
         }
+    }
 
-        // Select initial tab if specified, otherwise default to Version tab
-        if (!string.IsNullOrEmpty(_initialTab))
+    /// <summary>
+    /// Ensures the service start time is loaded before parsing transfers.
+    /// This is critical for correctly determining IsCurrentSession in ParseTransferItem().
+    /// </summary>
+    private async Task EnsureServiceStartTimeLoaded()
+    {
+        try
         {
-            SelectTabByName(_initialTab);
-        }
-        else if (!_hasError)
-        {
-            // Default to Version tab when opening normally (not from error state)
-            SelectTabByName("Version");
-        }
+            if (_grpcClient == null)
+            {
+                System.Diagnostics.Debug.WriteLine("EnsureServiceStartTimeLoaded: GrpcClient is null");
+                return;
+            }
 
-        // Subscribe to icon changes
-        if (trayService != null)
-        {
-            trayService.IconChanged += (s, iconName) => UpdateHeaderColor(iconName);
-            // Subscribe to connection state changes to refresh config when service reconnects
-            trayService.ConnectionStateChanged += OnServiceConnectionStateChanged;
+            // Get service system info to retrieve start time
+            var serviceInfo = await _grpcClient.GetServiceSystemInfoAsync();
+            if (serviceInfo != null)
+            {
+                var serviceStartTime = DateTimeOffset.FromUnixTimeMilliseconds(serviceInfo.StartTimeUnixMs).LocalDateTime;
+                _serviceStartTime = serviceStartTime;
+                System.Diagnostics.Debug.WriteLine($"EnsureServiceStartTimeLoaded: Set service start time to {_serviceStartTime:yyyy-MM-dd HH:mm:ss}");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("EnsureServiceStartTimeLoaded: GetServiceSystemInfoAsync returned null");
+            }
         }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading service start time: {ex.Message}");
+        }
+    }
 
-        // Subscribe to tab changes to refresh Version tab when opened
-        TabControl.SelectionChanged += TabControl_SelectionChanged;
+    /// <summary>
+    /// Loads initial transfer history when the About window opens.
+    /// Called in ContentRendered event to ensure UI is fully initialized.
+    /// </summary>
+    private async Task LoadInitialTransferHistory(Services.TrayIconService trayService)
+    {
+        try
+        {
+            var transfers = await trayService.GetInitialTransferHistoryAsync();
+            System.Diagnostics.Debug.WriteLine($"LoadInitialTransferHistory: Retrieved {transfers?.Count ?? 0} transfers");
+
+            if (transfers != null && transfers.Count > 0)
+            {
+                UpdateTransfers(transfers);
+                System.Diagnostics.Debug.WriteLine($"LoadInitialTransferHistory: Called UpdateTransfers with {transfers.Count} items");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("LoadInitialTransferHistory: No transfers to display");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading initial transfer history: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    /// <summary>
+    /// Loads database statistics from the service via gRPC.
+    /// </summary>
+    private async Task LoadDatabaseStatistics()
+    {
+        try
+        {
+            if (_trayIconService == null)
+            {
+                SystemDatabasePathText.Text = "(unavailable)";
+                SystemDatabaseStatusText.Text = "Service not connected";
+                SystemDatabaseRecordCountText.Text = "(unavailable)";
+                SystemDatabaseLastTransferText.Text = "(unavailable)";
+                return;
+            }
+
+            var stats = await _trayIconService.GetDatabaseStatistics();
+
+            if (stats == null)
+            {
+                SystemDatabasePathText.Text = "(unavailable)";
+                SystemDatabaseStatusText.Text = "Failed to retrieve statistics";
+                SystemDatabaseRecordCountText.Text = "(unavailable)";
+                SystemDatabaseLastTransferText.Text = "(unavailable)";
+                return;
+            }
+
+            // Display database path
+            SystemDatabasePathText.Text = stats.DatabasePath;
+
+            // Display status with color coding
+            if (!stats.IsEnabled)
+            {
+                SystemDatabaseStatusText.Text = "Disabled";
+                SystemDatabaseStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x99, 0x99, 0x99)); // Gray
+            }
+            else if (!stats.IsConnected)
+            {
+                SystemDatabaseStatusText.Text = "Not Connected";
+                SystemDatabaseStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00)); // Red
+            }
+            else
+            {
+                SystemDatabaseStatusText.Text = "Connected";
+                SystemDatabaseStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0x80, 0x00)); // Green
+            }
+
+            // Display record count
+            SystemDatabaseRecordCountText.Text = stats.TotalRecords.ToString("N0");
+
+            // Display last transfer timestamp
+            if (stats.LastTransferTimestamp.HasValue)
+            {
+                var lastTransfer = stats.LastTransferTimestamp.Value;
+                var timeSince = DateTime.Now - lastTransfer;
+
+                if (timeSince.TotalDays >= 1)
+                {
+                    SystemDatabaseLastTransferText.Text = $"{lastTransfer:yyyy-MM-dd HH:mm:ss} ({(int)timeSince.TotalDays} days ago)";
+                }
+                else if (timeSince.TotalHours >= 1)
+                {
+                    SystemDatabaseLastTransferText.Text = $"{lastTransfer:yyyy-MM-dd HH:mm:ss} ({(int)timeSince.TotalHours} hours ago)";
+                }
+                else
+                {
+                    SystemDatabaseLastTransferText.Text = $"{lastTransfer:yyyy-MM-dd HH:mm:ss} ({(int)timeSince.TotalMinutes} minutes ago)";
+                }
+            }
+            else
+            {
+                SystemDatabaseLastTransferText.Text = "(no transfers recorded)";
+            }
+
+            System.Diagnostics.Debug.WriteLine($"Database statistics loaded: Path={stats.DatabasePath}, Records={stats.TotalRecords}, Connected={stats.IsConnected}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading database statistics: {ex.Message}");
+            SystemDatabasePathText.Text = "(error)";
+            SystemDatabaseStatusText.Text = $"Error: {ex.Message}";
+            SystemDatabaseRecordCountText.Text = "(error)";
+            SystemDatabaseLastTransferText.Text = "(error)";
+        }
     }
 
     /// <summary>
@@ -131,6 +314,11 @@ public partial class AboutWindow : Window
             {
                 // Refresh version information when Version tab is opened
                 await RefreshVersionTab();
+            }
+            else if (selectedTab?.Header?.ToString() == "System")
+            {
+                // Load database statistics when System tab is opened
+                await LoadDatabaseStatistics();
             }
         }
     }
@@ -198,6 +386,83 @@ public partial class AboutWindow : Window
         }
     }
 
+    private void LoadRuntimeStateInformation()
+    {
+        try
+        {
+            if (App.RuntimeState == null)
+            {
+                // Set default "unavailable" text for all fields
+                if (RuntimeSessionIdText != null) RuntimeSessionIdText.Text = "(unavailable)";
+                if (RuntimeSessionStartText != null) RuntimeSessionStartText.Text = "(unavailable)";
+                if (RuntimeLastSessionEndText != null) RuntimeLastSessionEndText.Text = "(unavailable)";
+                if (RuntimeProcessingPausedText != null) RuntimeProcessingPausedText.Text = "(unavailable)";
+                if (RuntimeLastModifiedByText != null) RuntimeLastModifiedByText.Text = "(unavailable)";
+                if (RuntimeLastModifiedText != null) RuntimeLastModifiedText.Text = "(unavailable)";
+                if (RuntimeDarkModeText != null) RuntimeDarkModeText.Text = "(unavailable)";
+                if (RuntimeStateFilePathText != null) RuntimeStateFilePathText.Text = "Runtime state file: (unavailable)";
+                return;
+            }
+
+            var state = App.RuntimeState.GetState();
+
+            // Session Information
+            if (RuntimeSessionIdText != null)
+                RuntimeSessionIdText.Text = state.SessionId ?? "(none)";
+
+            if (RuntimeSessionStartText != null)
+                RuntimeSessionStartText.Text = state.SessionStartTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+
+            if (RuntimeLastSessionEndText != null)
+                RuntimeLastSessionEndText.Text = state.LastSessionEndTime.HasValue
+                    ? state.LastSessionEndTime.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                    : "(not yet ended)";
+
+            // Processing State
+            if (RuntimeProcessingPausedText != null)
+            {
+                RuntimeProcessingPausedText.Text = state.ProcessingPaused ? "YES" : "NO";
+                RuntimeProcessingPausedText.Foreground = state.ProcessingPaused
+                    ? new SolidColorBrush(Color.FromRgb(0xE7, 0x4C, 0x3C))
+                    : new SolidColorBrush(Color.FromRgb(0x2E, 0xCC, 0x71));
+            }
+
+            if (RuntimeLastModifiedByText != null)
+                RuntimeLastModifiedByText.Text = state.LastModifiedBy ?? "(none)";
+
+            if (RuntimeLastModifiedText != null)
+                RuntimeLastModifiedText.Text = state.LastModified.HasValue
+                    ? state.LastModified.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                    : "(never)";
+
+            // UI Preferences
+            if (RuntimeDarkModeText != null)
+            {
+                RuntimeDarkModeText.Text = state.DarkModeEnabled ? "YES" : "NO";
+                RuntimeDarkModeText.Foreground = state.DarkModeEnabled
+                    ? new SolidColorBrush(Color.FromRgb(0x4A, 0x90, 0xE2))
+                    : new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66));
+            }
+
+            // Runtime state file path
+            if (RuntimeStateFilePathText != null)
+            {
+                var stateFilePath = System.IO.Path.Combine(
+                    RJAutoMoverShared.Constants.Paths.GetSharedDataFolder(),
+                    "runtime-state.json");
+                RuntimeStateFilePathText.Text = $"Runtime state file: {stateFilePath}";
+            }
+
+            // Update the runtime processing button appearance
+            UpdateRuntimeProcessingButton();
+        }
+        catch (Exception ex)
+        {
+            // Silently fail - don't crash the About window
+            System.Diagnostics.Debug.WriteLine($"Error loading runtime state: {ex.Message}");
+        }
+    }
+
     private void LoadAboutInformation()
     {
         try
@@ -210,6 +475,9 @@ public partial class AboutWindow : Window
 
             // Load memory usage
             LoadMemoryUsage();
+
+            // Load runtime state information
+            LoadRuntimeStateInformation();
 
             // Load system information
             LoadSystemInformation();
@@ -633,6 +901,11 @@ public partial class AboutWindow : Window
     private void RefreshSystemInfo_Click(object sender, RoutedEventArgs e)
     {
         LoadMemoryUsage();
+    }
+
+    private async void RefreshDatabaseStats_Click(object sender, RoutedEventArgs e)
+    {
+        await LoadDatabaseStatistics();
     }
 
     private async void RefreshVersionInfo_Click(object sender, RoutedEventArgs e)
@@ -1072,8 +1345,8 @@ public partial class AboutWindow : Window
                 {
                     DisplayName = "Log Folder",
                     YamlFieldName = "LogFolder",
-                    Value = string.IsNullOrEmpty(config.Application.LogFolder) ? "(empty - defaults to <InstallFolder>\\Logs)" : config.Application.LogFolder,
-                    DefaultIndicator = config.Application.LogFolder == defaults.LogFolder ? " [default]" : $" [default = <InstallFolder>\\Logs]"
+                    Value = App.ServiceLogFolder ?? RJAutoMoverShared.Constants.Paths.GetSharedLogFolder(),
+                    DefaultIndicator = string.IsNullOrEmpty(config.Application.LogFolder) ? " [using default path]" : (config.Application.LogFolder == defaults.LogFolder ? " [default]" : " [from config]")
                 },
                 new AppSettingViewModel
                 {
@@ -1629,9 +1902,13 @@ public partial class AboutWindow : Window
     /// Called by TrayIconService when the window is opened.
     /// </summary>
     /// <param name="grpcClient">The gRPC client to use for service communication.</param>
-    public void SetGrpcClient(GrpcClientServiceV2 grpcClient)
+    public async void SetGrpcClient(GrpcClientServiceV2 grpcClient)
     {
         _grpcClient = grpcClient;
+
+        // CRITICAL: Load service start time FIRST before loading transfer history
+        // This ensures ParseTransferItem() can correctly determine IsCurrentSession
+        await EnsureServiceStartTimeLoaded();
 
         // Refresh all service-related information now that we have the gRPC client
         LoadMemoryUsage();
@@ -1677,19 +1954,15 @@ public partial class AboutWindow : Window
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            _transfers.Clear();
-
-            var transfers = recentItems
+            // Store all transfers in source list
+            _allTransfers = recentItems
                 .Select(ParseTransferItem)
                 .Where(t => t != null)
-                .OrderBy(t => t!.IsInProgress ? 0 : 1)
-                .ThenByDescending(t => t!.TimestampDateTime)
+                .Select(t => t!)
                 .ToList();
 
-            foreach (var transfer in transfers)
-            {
-                _transfers.Add(transfer!);
-            }
+            // Apply filtering and sorting
+            RefreshTransfersDisplay();
         });
     }
 
@@ -1819,24 +2092,7 @@ public partial class AboutWindow : Window
             AdvanceBrailleAnimation(transfer);
         }
 
-        var inProgressCount = _transfers.Count(t => t.IsInProgress);
-        var totalCount = _transfers.Count;
-
-        if (TransfersStatusText != null)
-        {
-            if (inProgressCount > 0)
-            {
-                TransfersStatusText.Text = $"{inProgressCount} transfer(s) in progress, {totalCount} total";
-            }
-            else if (totalCount > 0)
-            {
-                TransfersStatusText.Text = $"{totalCount} recent transfer(s)";
-            }
-            else
-            {
-                TransfersStatusText.Text = "No recent transfers";
-            }
-        }
+        // Status text removed - no longer displaying transfer counts
     }
 
     private void AdvanceBrailleAnimation(TransferDisplayItem transfer)
@@ -1857,21 +2113,16 @@ public partial class AboutWindow : Window
     {
         if (_trayIconService == null)
         {
-            if (TransfersStatusText != null)
-                TransfersStatusText.Text = "Tray service not available";
             return;
         }
 
         try
         {
             await _trayIconService.ToggleProcessing();
-            if (TransfersStatusText != null)
-                TransfersStatusText.Text = "Toggle request completed";
         }
         catch (Exception ex)
         {
-            if (TransfersStatusText != null)
-                TransfersStatusText.Text = $"Error: {ex.Message}";
+            MessageBox.Show($"Error toggling processing: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -1896,8 +2147,168 @@ public partial class AboutWindow : Window
             if (TransfersToggleButton != null)
             {
                 TransfersToggleButton.Content = _isProcessingPaused ? "Resume Processing" : "Pause Processing";
+
+                // Update button appearance for better visibility when paused
+                if (_isProcessingPaused)
+                {
+                    // Yellow background with dark text for paused state
+                    TransfersToggleButton.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07)); // Yellow
+                    TransfersToggleButton.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)); // Dark text
+                    TransfersToggleButton.FontWeight = FontWeights.Bold;
+                }
+                else
+                {
+                    // Gray background for normal state
+                    TransfersToggleButton.Background = new SolidColorBrush(Color.FromRgb(0xEE, 0xEE, 0xEE));
+                    TransfersToggleButton.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+                    TransfersToggleButton.FontWeight = FontWeights.Normal;
+                }
             }
         });
+    }
+
+    /// <summary>
+    /// Handles column header clicks to toggle sorting.
+    /// </summary>
+    private void SortColumn_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is TextBlock header && header.Tag is string column)
+        {
+            // Toggle sort direction if clicking same column, otherwise default to descending
+            if (_currentSortColumn == column)
+            {
+                _sortAscending = !_sortAscending;
+            }
+            else
+            {
+                _currentSortColumn = column;
+                _sortAscending = false;
+            }
+
+            // Update column headers
+            UpdateColumnHeaders();
+
+            // Re-sort the transfers
+            RefreshTransfersDisplay();
+        }
+    }
+
+    /// <summary>
+    /// Updates column header text to show sort indicators.
+    /// </summary>
+    private void UpdateColumnHeaders()
+    {
+        var arrow = _sortAscending ? " ▲" : " ▼";
+
+        if (TimeColumnHeader != null)
+            TimeColumnHeader.Text = _currentSortColumn == "Time" ? $"Time{arrow}" : "Time";
+        if (SizeColumnHeader != null)
+            SizeColumnHeader.Text = _currentSortColumn == "Size" ? $"Size{arrow}" : "Size";
+        if (FilenameColumnHeader != null)
+            FilenameColumnHeader.Text = _currentSortColumn == "Filename" ? $"Filename{arrow}" : "Filename";
+        if (RuleColumnHeader != null)
+            RuleColumnHeader.Text = _currentSortColumn == "Rule" ? $"Rule{arrow}" : "Rule";
+    }
+
+    /// <summary>
+    /// Handles session filter changes.
+    /// </summary>
+    private void SessionFilter_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (SessionFilterComboBox?.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+        {
+            _selectedSessionFilter = tag;
+            RefreshTransfersDisplay();
+        }
+    }
+
+    /// <summary>
+    /// Handles search text changes.
+    /// </summary>
+    private void TransfersSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (TransfersSearchTextBox != null && TransfersSearchTextBox.Foreground.ToString() != "#FF999999")
+        {
+            _transfersSearchText = TransfersSearchTextBox.Text.ToLower();
+            RefreshTransfersDisplay();
+        }
+    }
+
+    private void TransfersSearchTextBox_GotFocus(object sender, RoutedEventArgs e)
+    {
+        if (TransfersSearchTextBox != null && TransfersSearchTextBox.Text == "Search transfers...")
+        {
+            TransfersSearchTextBox.Text = "";
+            TransfersSearchTextBox.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+        }
+    }
+
+    private void TransfersSearchTextBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (TransfersSearchTextBox != null && string.IsNullOrWhiteSpace(TransfersSearchTextBox.Text))
+        {
+            TransfersSearchTextBox.Text = "Search transfers...";
+            TransfersSearchTextBox.Foreground = new SolidColorBrush(Color.FromRgb(0x99, 0x99, 0x99));
+            _transfersSearchText = "";
+            RefreshTransfersDisplay();
+        }
+    }
+
+    /// <summary>
+    /// Refreshes the transfers display with current sorting, filtering, and search.
+    /// </summary>
+    private void RefreshTransfersDisplay()
+    {
+        if (_allTransfers == null) return;
+
+        var filtered = _allTransfers.AsEnumerable();
+
+        // Apply session filter
+        if (_selectedSessionFilter == "Current")
+        {
+            filtered = filtered.Where(t => t.IsCurrentSession);
+        }
+        else if (_selectedSessionFilter == "Previous")
+        {
+            filtered = filtered.Where(t => !t.IsCurrentSession);
+        }
+
+        var afterSessionFilter = filtered.ToList();
+
+        // Apply search filter (ignore placeholder text)
+        if (!string.IsNullOrEmpty(_transfersSearchText) && _transfersSearchText != "search transfers...")
+        {
+            filtered = afterSessionFilter.Where(t =>
+                t.FileName.ToLower().Contains(_transfersSearchText) ||
+                t.RuleName.ToLower().Contains(_transfersSearchText) ||
+                t.SourceFolder.ToLower().Contains(_transfersSearchText) ||
+                t.DestinationFolder.ToLower().Contains(_transfersSearchText));
+        }
+        else
+        {
+            filtered = afterSessionFilter;
+        }
+
+        // Apply sorting
+        IOrderedEnumerable<TransferDisplayItem> sorted;
+        sorted = _currentSortColumn switch
+        {
+            "Time" => _sortAscending ? filtered.OrderBy(t => t.TimestampDateTime) : filtered.OrderByDescending(t => t.TimestampDateTime),
+            "Size" => _sortAscending ? filtered.OrderBy(t => t.FileSizeBytes) : filtered.OrderByDescending(t => t.FileSizeBytes),
+            "Filename" => _sortAscending ? filtered.OrderBy(t => t.FileName) : filtered.OrderByDescending(t => t.FileName),
+            "Rule" => _sortAscending ? filtered.OrderBy(t => t.RuleName) : filtered.OrderByDescending(t => t.RuleName),
+            _ => filtered.OrderByDescending(t => t.TimestampDateTime)
+        };
+
+        // Keep in-progress items at top
+        var result = sorted.OrderBy(t => t.IsInProgress ? 0 : 1).ToList();
+
+        // Update the observable collection
+        _transfers.Clear();
+        foreach (var item in result)
+        {
+            _transfers.Add(item);
+        }
     }
 
     /// <summary>
@@ -1943,6 +2354,216 @@ public partial class AboutWindow : Window
                 }
             }
         });
+    }
+
+    #endregion
+
+    #region Dark Mode
+
+    /// <summary>
+    /// Handles dark mode toggle button click (header button).
+    /// </summary>
+    private void DarkModeToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (App.RuntimeState != null)
+        {
+            var isDark = !App.RuntimeState.DarkModeEnabled;
+            App.RuntimeState.DarkModeEnabled = isDark;
+            ApplyTheme(isDark);
+            LoadRuntimeStateInformation(); // Refresh the Runtime State tab display
+        }
+    }
+
+    /// <summary>
+    /// Handles runtime dark mode toggle button click (from Runtime State tab).
+    /// </summary>
+    private void RuntimeToggleDarkMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (App.RuntimeState != null)
+        {
+            var isDark = !App.RuntimeState.DarkModeEnabled;
+            App.RuntimeState.DarkModeEnabled = isDark;
+            ApplyTheme(isDark);
+            LoadRuntimeStateInformation(); // Refresh the Runtime State tab display
+        }
+    }
+
+    /// <summary>
+    /// Handles runtime processing toggle button click (from Runtime State tab).
+    /// </summary>
+    private async void RuntimeToggleProcessing_Click(object sender, RoutedEventArgs e)
+    {
+        if (_trayIconService != null)
+        {
+            try
+            {
+                await _trayIconService.ToggleProcessing();
+                // The state will be updated via the SetProcessingPaused callback
+                // Wait a moment then refresh the display
+                await Task.Delay(500);
+                LoadRuntimeStateInformation();
+                UpdateRuntimeProcessingButton();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error toggling processing: {ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Updates the runtime processing toggle button appearance based on current state.
+    /// </summary>
+    private void UpdateRuntimeProcessingButton()
+    {
+        if (RuntimeToggleProcessingButton != null)
+        {
+            RuntimeToggleProcessingButton.Content = _isProcessingPaused ? "Resume Processing" : "Pause Processing";
+
+            // Update button appearance for better visibility when paused
+            if (_isProcessingPaused)
+            {
+                // Yellow background with dark text for paused state
+                RuntimeToggleProcessingButton.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07));
+                RuntimeToggleProcessingButton.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+                RuntimeToggleProcessingButton.FontWeight = FontWeights.Bold;
+            }
+            else
+            {
+                // Gray background for normal state
+                RuntimeToggleProcessingButton.Background = new SolidColorBrush(Color.FromRgb(0xEE, 0xEE, 0xEE));
+                RuntimeToggleProcessingButton.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+                RuntimeToggleProcessingButton.FontWeight = FontWeights.Normal;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Applies light or dark theme to all UI elements.
+    /// </summary>
+    private void ApplyTheme(bool isDark)
+    {
+        try
+        {
+            // Update toggle button appearance based on current mode
+            if (DarkModeToggleButton != null)
+            {
+                if (isDark)
+                {
+                    // Dark mode active - show "Light" button with light colors
+                    DarkModeToggleButton.Content = "☀️ Light";
+                    DarkModeToggleButton.Background = new SolidColorBrush(Color.FromRgb(0xF5, 0xF5, 0xF5)); // Light gray
+                    DarkModeToggleButton.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)); // Dark text
+                }
+                else
+                {
+                    // Light mode active - show "Dark" button with dark colors
+                    DarkModeToggleButton.Content = "🌙 Dark";
+                    DarkModeToggleButton.Background = new SolidColorBrush(Color.FromRgb(0x4A, 0x90, 0xE2)); // Blue
+                    DarkModeToggleButton.Foreground = new SolidColorBrush(Colors.White);
+                }
+            }
+
+            // Define color schemes
+            var windowBg = isDark ? Color.FromRgb(0x1E, 0x1E, 0x1E) : Color.FromRgb(0xF5, 0xF5, 0xF5);
+            var tabBg = isDark ? Color.FromRgb(0x2D, 0x2D, 0x30) : Colors.White;
+            var borderColor = isDark ? Color.FromRgb(0x3E, 0x3E, 0x42) : Color.FromRgb(0xDD, 0xDD, 0xDD);
+            var textPrimary = isDark ? Color.FromRgb(0xE0, 0xE0, 0xE0) : Color.FromRgb(0x33, 0x33, 0x33);
+            var textSecondary = isDark ? Color.FromRgb(0xA0, 0xA0, 0xA0) : Color.FromRgb(0x66, 0x66, 0x66);
+            var textTertiary = isDark ? Color.FromRgb(0x80, 0x80, 0x80) : Color.FromRgb(0x99, 0x99, 0x99);
+            var accentBlue = isDark ? Color.FromRgb(0x4A, 0x90, 0xE2) : Color.FromRgb(0x35, 0x7A, 0xBD);
+            var contentBg = isDark ? Color.FromRgb(0x25, 0x25, 0x28) : Color.FromRgb(0xF8, 0xF8, 0xF8);
+            var hoverBg = isDark ? Color.FromRgb(0x3E, 0x3E, 0x42) : Color.FromRgb(0xE0, 0xE0, 0xE0);
+
+            // Transfer row colors
+            var successBg = isDark ? Color.FromRgb(0x1A, 0x2F, 0x1A) : Color.FromRgb(0xF0, 0xFF, 0xF0);
+            var failedBg = isDark ? Color.FromRgb(0x2F, 0x1A, 0x1A) : Color.FromRgb(0xFF, 0xF0, 0xF0);
+            var warningBg = isDark ? Color.FromRgb(0x2F, 0x2A, 0x1A) : Color.FromRgb(0xFF, 0xF8, 0xDC);
+            var inProgressBg = isDark ? Color.FromRgb(0x1A, 0x25, 0x2F) : Color.FromRgb(0xE8, 0xF4, 0xF8);
+
+            // Apply to window
+            this.Background = new SolidColorBrush(windowBg);
+
+            // Update resource styles
+            if (Resources["InfoLabelStyle"] is Style infoLabelStyle)
+            {
+                foreach (var setter in infoLabelStyle.Setters.OfType<Setter>())
+                {
+                    if (setter.Property == TextBlock.ForegroundProperty)
+                        setter.Value = new SolidColorBrush(textSecondary);
+                }
+            }
+
+            if (Resources["InfoValueStyle"] is Style infoValueStyle)
+            {
+                foreach (var setter in infoValueStyle.Setters.OfType<Setter>())
+                {
+                    if (setter.Property == TextBlock.ForegroundProperty)
+                        setter.Value = new SolidColorBrush(textPrimary);
+                }
+            }
+
+            if (Resources["SectionHeaderStyle"] is Style sectionHeaderStyle)
+            {
+                foreach (var setter in sectionHeaderStyle.Setters.OfType<Setter>())
+                {
+                    if (setter.Property == TextBlock.ForegroundProperty)
+                        setter.Value = new SolidColorBrush(accentBlue);
+                }
+            }
+
+            // Apply theme to all tabs
+            ApplyTransfersTheme(isDark, tabBg, borderColor, textPrimary, textSecondary, textTertiary, contentBg, hoverBg, successBg, failedBg, warningBg, inProgressBg);
+            ApplyConfigTheme(isDark, tabBg, borderColor, textPrimary, textSecondary, contentBg);
+            ApplyLogsTheme(isDark, tabBg, borderColor, textPrimary, contentBg);
+            ApplySystemTheme(isDark, tabBg, textPrimary, textSecondary);
+            ApplyDotNetTheme(isDark, tabBg, textPrimary, textSecondary);
+            ApplyVersionTheme(isDark, tabBg, textPrimary, textSecondary);
+            ApplyErrorTheme(isDark, tabBg, textPrimary, textSecondary);
+        }
+        catch (Exception ex)
+        {
+            // Silently fail - don't crash the About window
+            System.Diagnostics.Debug.WriteLine($"Error applying theme: {ex.Message}");
+        }
+    }
+
+    private void ApplyTransfersTheme(bool isDark, Color tabBg, Color borderColor, Color textPrimary, Color textSecondary, Color textTertiary, Color contentBg, Color hoverBg, Color successBg, Color failedBg, Color warningBg, Color inProgressBg)
+    {
+        // This method would update transfer-specific colors
+        // For now, the DataTriggers in XAML will handle row colors
+        // We'd need to add x:Name to elements to update them dynamically
+    }
+
+    private void ApplyConfigTheme(bool isDark, Color tabBg, Color borderColor, Color textPrimary, Color textSecondary, Color contentBg)
+    {
+        // Config tab theme updates
+    }
+
+    private void ApplyLogsTheme(bool isDark, Color tabBg, Color borderColor, Color textPrimary, Color contentBg)
+    {
+        // Logs tab theme updates
+    }
+
+    private void ApplySystemTheme(bool isDark, Color tabBg, Color textPrimary, Color textSecondary)
+    {
+        // System tab theme updates
+    }
+
+    private void ApplyDotNetTheme(bool isDark, Color tabBg, Color textPrimary, Color textSecondary)
+    {
+        // .NET tab theme updates
+    }
+
+    private void ApplyVersionTheme(bool isDark, Color tabBg, Color textPrimary, Color textSecondary)
+    {
+        // Version tab theme updates
+    }
+
+    private void ApplyErrorTheme(bool isDark, Color tabBg, Color textPrimary, Color textSecondary)
+    {
+        // Error tab theme updates
     }
 
     #endregion

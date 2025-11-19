@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Microsoft.Win32;
 using RJAutoMoverShared.Models;
+using RJAutoMoverShared.Helpers;
 
 namespace RJAutoMoverConfig.Windows;
 
@@ -39,9 +40,7 @@ public partial class FileRuleEditorDialog : Window, INotifyPropertyChanged
             ScanIntervalMs = ruleToEdit.ScanIntervalMs,
             FileExists = ruleToEdit.FileExists,
             IsActive = ruleToEdit.IsActive,
-            LastAccessedMins = ruleToEdit.LastAccessedMins,
-            LastModifiedMins = ruleToEdit.LastModifiedMins,
-            AgeCreatedMins = ruleToEdit.AgeCreatedMins
+            DateFilter = ruleToEdit.DateFilter
         };
 
         DataContext = _workingCopy;
@@ -49,9 +48,21 @@ public partial class FileRuleEditorDialog : Window, INotifyPropertyChanged
         // Defer initialization until window is loaded to ensure all XAML elements are ready
         this.Loaded += (s, e) =>
         {
-            // Initialize FileExists radio buttons
-            FileExistsSkip = _workingCopy.FileExists?.ToLower() == "skip";
-            FileExistsOverwrite = _workingCopy.FileExists?.ToLower() == "overwrite";
+            // Initialize FileExists radio buttons - check the value from the config
+            var fileExistsValue = _workingCopy.FileExists?.Trim().ToLower() ?? "skip";
+
+            if (fileExistsValue == "overwrite")
+            {
+                FileExistsOverwriteRadio.IsChecked = true;
+                FileExistsSkipRadio.IsChecked = false;
+            }
+            else
+            {
+                FileExistsSkipRadio.IsChecked = true;
+                FileExistsOverwriteRadio.IsChecked = false;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"FileRuleEditorDialog: FileExists value = '{_workingCopy.FileExists}', set Skip={FileExistsSkipRadio.IsChecked}, Overwrite={FileExistsOverwriteRadio.IsChecked}");
 
             // Initialize date filter radio buttons
             InitializeDateFilters();
@@ -75,105 +86,60 @@ public partial class FileRuleEditorDialog : Window, INotifyPropertyChanged
     /// </summary>
     public FileRule? EditedRule { get; private set; }
 
-    private bool _fileExistsSkip;
-
     /// <summary>
-    /// Two-way binding for FileExists "skip" radio button
-    /// </summary>
-    public bool FileExistsSkip
-    {
-        get => _fileExistsSkip;
-        set
-        {
-            _fileExistsSkip = value;
-            if (value && _workingCopy != null)
-            {
-                _workingCopy.FileExists = "skip";
-            }
-            OnPropertyChanged();
-        }
-    }
-
-    private bool _fileExistsOverwrite;
-
-    /// <summary>
-    /// Two-way binding for FileExists "overwrite" radio button
-    /// </summary>
-    public bool FileExistsOverwrite
-    {
-        get => _fileExistsOverwrite;
-        set
-        {
-            _fileExistsOverwrite = value;
-            if (value && _workingCopy != null)
-            {
-                _workingCopy.FileExists = "overwrite";
-            }
-            OnPropertyChanged();
-        }
-    }
-
-    /// <summary>
-    /// Initializes the date filter radio buttons based on the rule's current settings
+    /// Initializes the date filter controls based on the rule's current DateFilter string
     /// </summary>
     private void InitializeDateFilters()
     {
         try
         {
-            if (_workingCopy.LastAccessedMins.HasValue)
-            {
-                LastAccessedRadio.IsChecked = true;
-                var value = _workingCopy.LastAccessedMins.Value;
-                if (value < 0)
-                {
-                    LastAccessedWithinRadio.IsChecked = true;
-                    LastAccessedMinsTextBox.Text = Math.Abs(value).ToString();
-                }
-                else
-                {
-                    LastAccessedOlderRadio.IsChecked = true;
-                    LastAccessedMinsTextBox.Text = value.ToString();
-                }
-            }
-            else if (_workingCopy.LastModifiedMins.HasValue)
-            {
-                LastModifiedRadio.IsChecked = true;
-                var value = _workingCopy.LastModifiedMins.Value;
-                if (value < 0)
-                {
-                    LastModifiedWithinRadio.IsChecked = true;
-                    LastModifiedMinsTextBox.Text = Math.Abs(value).ToString();
-                }
-                else
-                {
-                    LastModifiedOlderRadio.IsChecked = true;
-                    LastModifiedMinsTextBox.Text = value.ToString();
-                }
-            }
-            else if (_workingCopy.AgeCreatedMins.HasValue)
-            {
-                AgeCreatedRadio.IsChecked = true;
-                var value = _workingCopy.AgeCreatedMins.Value;
-                if (value < 0)
-                {
-                    AgeCreatedWithinRadio.IsChecked = true;
-                    AgeCreatedMinsTextBox.Text = Math.Abs(value).ToString();
-                }
-                else
-                {
-                    AgeCreatedOlderRadio.IsChecked = true;
-                    AgeCreatedMinsTextBox.Text = value.ToString();
-                }
-            }
-            else
+            // Check if there's a DateFilter to parse
+            if (string.IsNullOrWhiteSpace(_workingCopy.DateFilter))
             {
                 NoDateFilterRadio.IsChecked = true;
+                return;
+            }
+
+            // Parse the DateFilter string using DateFilterHelper
+            var parsed = DateFilterHelper.Parse(_workingCopy.DateFilter);
+            if (!parsed.IsValid)
+            {
+                System.Diagnostics.Debug.WriteLine($"Invalid DateFilter: {parsed.ErrorMessage}");
+                NoDateFilterRadio.IsChecked = true;
+                return;
+            }
+
+            // Set the appropriate UI controls based on the filter type
+            switch (parsed.Type)
+            {
+                case DateFilterHelper.FilterType.LastAccessed:
+                    LastAccessedRadio.IsChecked = true;
+                    LastAccessedDirection.SelectedIndex = parsed.Direction == DateFilterHelper.FilterDirection.OlderThan ? 0 : 1;
+                    LastAccessedMinsTextBox.Text = parsed.Minutes.ToString();
+                    break;
+
+                case DateFilterHelper.FilterType.LastModified:
+                    LastModifiedRadio.IsChecked = true;
+                    LastModifiedDirection.SelectedIndex = parsed.Direction == DateFilterHelper.FilterDirection.OlderThan ? 0 : 1;
+                    LastModifiedMinsTextBox.Text = parsed.Minutes.ToString();
+                    break;
+
+                case DateFilterHelper.FilterType.FileCreated:
+                    AgeCreatedRadio.IsChecked = true;
+                    AgeCreatedDirection.SelectedIndex = parsed.Direction == DateFilterHelper.FilterDirection.OlderThan ? 0 : 1;
+                    AgeCreatedMinsTextBox.Text = parsed.Minutes.ToString();
+                    break;
+
+                default:
+                    NoDateFilterRadio.IsChecked = true;
+                    break;
             }
         }
         catch (Exception ex)
         {
             // Log the error but don't crash - just use defaults
             System.Diagnostics.Debug.WriteLine($"Error initializing date filters: {ex.Message}");
+            NoDateFilterRadio.IsChecked = true;
         }
     }
 
@@ -261,6 +227,292 @@ public partial class FileRuleEditorDialog : Window, INotifyPropertyChanged
             LastModifiedMinsTextBox.Text = "";
             AgeCreatedMinsTextBox.Text = "";
         }
+
+        // Revalidate when filter type changes
+        ValidateDateFilter();
+        UpdateValidationSummary();
+    }
+
+    /// <summary>
+    /// Real-time validation for rule name
+    /// </summary>
+    private void RuleNameTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        ValidateRuleName();
+        UpdateValidationSummary();
+    }
+
+    /// <summary>
+    /// Real-time validation for extension
+    /// </summary>
+    private void ExtensionTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        ValidateExtension();
+        UpdateValidationSummary();
+    }
+
+    /// <summary>
+    /// Real-time validation for scan interval
+    /// </summary>
+    private void ScanIntervalTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        ValidateScanInterval();
+        UpdateValidationSummary();
+    }
+
+    /// <summary>
+    /// Real-time validation for date filters (TextBox changed)
+    /// </summary>
+    private void DateFilterTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        ValidateDateFilter();
+        UpdateValidationSummary();
+    }
+
+    /// <summary>
+    /// Event handler for FileExists radio button changes
+    /// </summary>
+    private void FileExistsRadio_Checked(object sender, RoutedEventArgs e)
+    {
+        if (_workingCopy == null) return;
+
+        if (sender == FileExistsSkipRadio && FileExistsSkipRadio.IsChecked == true)
+        {
+            _workingCopy.FileExists = "skip";
+            System.Diagnostics.Debug.WriteLine("FileExistsRadio_Checked: Set FileExists = 'skip'");
+        }
+        else if (sender == FileExistsOverwriteRadio && FileExistsOverwriteRadio.IsChecked == true)
+        {
+            _workingCopy.FileExists = "overwrite";
+            System.Diagnostics.Debug.WriteLine("FileExistsRadio_Checked: Set FileExists = 'overwrite'");
+        }
+    }
+
+    /// <summary>
+    /// Real-time validation for date filters (ComboBox selection changed)
+    /// </summary>
+    private void DateFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ValidateDateFilter();
+        UpdateValidationSummary();
+    }
+
+    /// <summary>
+    /// Validates rule name and shows inline error
+    /// </summary>
+    private void ValidateRuleName()
+    {
+        if (RuleNameTextBox == null || RuleNameError == null) return;
+
+        var name = RuleNameTextBox.Text?.Trim() ?? "";
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            ShowFieldError(RuleNameTextBox, RuleNameError, "Rule name is required");
+        }
+        else if (name.Length > 32)
+        {
+            ShowFieldError(RuleNameTextBox, RuleNameError, "Rule name must be 32 characters or less");
+        }
+        else if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^[a-zA-Z0-9\s]+$"))
+        {
+            ShowFieldError(RuleNameTextBox, RuleNameError, "Rule name must contain only letters, numbers, and spaces");
+        }
+        else
+        {
+            ClearFieldError(RuleNameTextBox, RuleNameError);
+        }
+    }
+
+    /// <summary>
+    /// Validates extension and shows inline error
+    /// </summary>
+    private void ValidateExtension()
+    {
+        if (ExtensionTextBox == null || ExtensionError == null) return;
+
+        var extension = ExtensionTextBox.Text?.Trim() ?? "";
+
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            ShowFieldError(ExtensionTextBox, ExtensionError, "Extension is required");
+        }
+        else if (extension.Equals("OTHERS", StringComparison.OrdinalIgnoreCase))
+        {
+            // OTHERS is valid, clear error
+            ClearFieldError(ExtensionTextBox, ExtensionError);
+        }
+        else
+        {
+            // Validate extension format (must start with period or be pipe-separated)
+            var extensions = extension.Split('|');
+            bool allValid = true;
+            foreach (var ext in extensions)
+            {
+                var trimmedExt = ext.Trim();
+                if (!trimmedExt.StartsWith(".") || trimmedExt.Length < 2)
+                {
+                    allValid = false;
+                    break;
+                }
+            }
+
+            if (!allValid)
+            {
+                ShowFieldError(ExtensionTextBox, ExtensionError, "Extensions must start with a period (e.g., .pdf or .doc|.txt)");
+            }
+            else
+            {
+                ClearFieldError(ExtensionTextBox, ExtensionError);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Validates scan interval and shows inline error
+    /// </summary>
+    private void ValidateScanInterval()
+    {
+        if (ScanIntervalTextBox == null || ScanIntervalError == null) return;
+
+        var text = ScanIntervalTextBox.Text?.Trim() ?? "";
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            ShowFieldError(ScanIntervalTextBox, ScanIntervalError, "Scan interval is required");
+        }
+        else if (!int.TryParse(text, out int value))
+        {
+            ShowFieldError(ScanIntervalTextBox, ScanIntervalError, "Scan interval must be a number");
+        }
+        else if (value < 5000 || value > 900000)
+        {
+            ShowFieldError(ScanIntervalTextBox, ScanIntervalError, "Scan interval must be between 5000 and 900000 ms");
+        }
+        else
+        {
+            ClearFieldError(ScanIntervalTextBox, ScanIntervalError);
+        }
+    }
+
+    /// <summary>
+    /// Validates date filter values and shows inline error
+    /// </summary>
+    private void ValidateDateFilter()
+    {
+        if (DateFilterError == null) return;
+
+        // Check which filter is active
+        if (LastAccessedRadio?.IsChecked == true)
+        {
+            ValidateDateFilterValue(LastAccessedMinsTextBox?.Text, "Last Accessed");
+        }
+        else if (LastModifiedRadio?.IsChecked == true)
+        {
+            ValidateDateFilterValue(LastModifiedMinsTextBox?.Text, "Last Modified");
+        }
+        else if (AgeCreatedRadio?.IsChecked == true)
+        {
+            ValidateDateFilterValue(AgeCreatedMinsTextBox?.Text, "Age Created");
+        }
+        else
+        {
+            DateFilterError.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    /// <summary>
+    /// Validates a specific date filter value
+    /// </summary>
+    private void ValidateDateFilterValue(string? text, string filterName)
+    {
+        if (DateFilterError == null) return;
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            DateFilterError.Text = $"{filterName}: value is required";
+            DateFilterError.Visibility = Visibility.Visible;
+        }
+        else if (!int.TryParse(text, out int value))
+        {
+            DateFilterError.Text = $"{filterName}: must be a number";
+            DateFilterError.Visibility = Visibility.Visible;
+        }
+        else if (value == 0)
+        {
+            DateFilterError.Text = $"{filterName}: cannot be zero";
+            DateFilterError.Visibility = Visibility.Visible;
+        }
+        else if (value < 1 || value > 5256000)
+        {
+            DateFilterError.Text = $"{filterName}: must be between 1 and 5256000 minutes";
+            DateFilterError.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            DateFilterError.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    /// <summary>
+    /// Shows inline error for a field
+    /// </summary>
+    private void ShowFieldError(TextBox textBox, TextBlock errorBlock, string message)
+    {
+        textBox.BorderBrush = new SolidColorBrush(Colors.Red);
+        textBox.BorderThickness = new Thickness(2);
+        errorBlock.Text = message;
+        errorBlock.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Clears inline error for a field
+    /// </summary>
+    private void ClearFieldError(TextBox textBox, TextBlock errorBlock)
+    {
+        textBox.ClearValue(BorderBrushProperty);
+        textBox.ClearValue(BorderThicknessProperty);
+        errorBlock.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// Updates the validation summary at the top of the dialog
+    /// </summary>
+    private void UpdateValidationSummary()
+    {
+        if (ValidationSummary == null || ValidationSummaryText == null) return;
+
+        var errors = new List<string>();
+
+        // Collect all visible errors
+        if (RuleNameError?.Visibility == Visibility.Visible)
+            errors.Add(RuleNameError.Text);
+        if (ExtensionError?.Visibility == Visibility.Visible)
+            errors.Add(ExtensionError.Text);
+        if (ScanIntervalError?.Visibility == Visibility.Visible)
+            errors.Add(ScanIntervalError.Text);
+        if (DateFilterError?.Visibility == Visibility.Visible)
+            errors.Add(DateFilterError.Text);
+
+        // Check OTHERS extension requiring date filter
+        var extension = ExtensionTextBox?.Text?.Trim() ?? "";
+        if (extension.Equals("OTHERS", StringComparison.OrdinalIgnoreCase))
+        {
+            if (NoDateFilterRadio?.IsChecked == true)
+            {
+                errors.Add("Extension 'OTHERS' requires a date filter");
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            ValidationSummaryText.Text = string.Join("\n", errors.Select((e, i) => $"{i + 1}. {e}"));
+            ValidationSummary.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            ValidationSummary.Visibility = Visibility.Collapsed;
+        }
     }
 
     /// <summary>
@@ -302,24 +554,31 @@ public partial class FileRuleEditorDialog : Window, INotifyPropertyChanged
                 return;
             }
 
-            // Only check if directory exists if it's a normal path (not a network path that might hang)
-            // Network paths starting with \\ can cause timeouts
-            bool exists = false;
-            if (!path.StartsWith("\\\\"))
-            {
-                exists = Directory.Exists(path);
-            }
-
+            // Only validate syntax - service will validate actual permissions under its own user context
+            // Check if path looks syntactically valid
             if (SourceFolderStatus != null)
             {
-                if (exists)
+                try
                 {
-                    SourceFolderStatus.Text = "✓ Folder exists and is accessible";
-                    SourceFolderStatus.Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80));
+                    // Try to parse the path to check if it's valid
+                    var fullPath = Path.IsPathFullyQualified(path) ? path : Path.GetFullPath(path);
+
+                    // Check for invalid characters
+                    var invalidChars = Path.GetInvalidPathChars();
+                    if (path.Any(c => invalidChars.Contains(c)))
+                    {
+                        SourceFolderStatus.Text = "⚠ Path contains invalid characters";
+                        SourceFolderStatus.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
+                    }
+                    else
+                    {
+                        SourceFolderStatus.Text = "✓ Path syntax is valid (service will verify access)";
+                        SourceFolderStatus.Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Green
+                    }
                 }
-                else
+                catch
                 {
-                    SourceFolderStatus.Text = path.StartsWith("\\\\") ? "⚠ Network path - cannot validate" : "⚠ Folder does not exist";
+                    SourceFolderStatus.Text = "⚠ Invalid path syntax";
                     SourceFolderStatus.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
                 }
             }
@@ -375,25 +634,32 @@ public partial class FileRuleEditorDialog : Window, INotifyPropertyChanged
                 return;
             }
 
-            // Only check if directory exists if it's a normal path (not a network path that might hang)
-            // Network paths starting with \\ can cause timeouts
-            bool exists = false;
-            if (!path.StartsWith("\\\\"))
-            {
-                exists = Directory.Exists(path);
-            }
-
+            // Only validate syntax - service will validate actual permissions under its own user context
+            // Check if path looks syntactically valid
             if (DestinationFolderStatus != null)
             {
-                if (exists)
+                try
                 {
-                    DestinationFolderStatus.Text = "✓ Folder exists and is writable";
-                    DestinationFolderStatus.Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80));
+                    // Try to parse the path to check if it's valid
+                    var fullPath = Path.IsPathFullyQualified(path) ? path : Path.GetFullPath(path);
+
+                    // Check for invalid characters
+                    var invalidChars = Path.GetInvalidPathChars();
+                    if (path.Any(c => invalidChars.Contains(c)))
+                    {
+                        DestinationFolderStatus.Text = "⚠ Path contains invalid characters";
+                        DestinationFolderStatus.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
+                    }
+                    else
+                    {
+                        DestinationFolderStatus.Text = "✓ Path syntax is valid (service will verify access)";
+                        DestinationFolderStatus.Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Green
+                    }
                 }
-                else
+                catch
                 {
-                    DestinationFolderStatus.Text = path.StartsWith("\\\\") ? "⚠ Network path - cannot validate" : "⚠ Folder does not exist";
-                    DestinationFolderStatus.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0));
+                    DestinationFolderStatus.Text = "⚠ Invalid path syntax";
+                    DestinationFolderStatus.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
                 }
             }
         }
@@ -458,46 +724,53 @@ public partial class FileRuleEditorDialog : Window, INotifyPropertyChanged
             return;
         }
 
-        // Process date filters
-        _workingCopy.LastAccessedMins = null;
-        _workingCopy.LastModifiedMins = null;
-        _workingCopy.AgeCreatedMins = null;
+        // Process date filters using new DateFilter format
+        _workingCopy.DateFilter = string.Empty;
 
         if (LastAccessedRadio.IsChecked == true)
         {
-            if (int.TryParse(LastAccessedMinsTextBox.Text, out int value) && value != 0)
+            if (int.TryParse(LastAccessedMinsTextBox.Text, out int value) && value != 0 && value >= 1 && value <= 5256000)
             {
-                _workingCopy.LastAccessedMins = LastAccessedWithinRadio.IsChecked == true ? -value : value;
+                var direction = LastAccessedDirection.SelectedIndex == 1
+                    ? DateFilterHelper.FilterDirection.WithinLast
+                    : DateFilterHelper.FilterDirection.OlderThan;
+                _workingCopy.DateFilter = DateFilterHelper.Format(DateFilterHelper.FilterType.LastAccessed, direction, value);
             }
             else
             {
-                MessageBox.Show("Last Accessed value must be a non-zero number.", "Validation Error",
+                MessageBox.Show("Last Accessed value must be a number between 1 and 5256000.", "Validation Error",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
         }
         else if (LastModifiedRadio.IsChecked == true)
         {
-            if (int.TryParse(LastModifiedMinsTextBox.Text, out int value) && value != 0)
+            if (int.TryParse(LastModifiedMinsTextBox.Text, out int value) && value != 0 && value >= 1 && value <= 5256000)
             {
-                _workingCopy.LastModifiedMins = LastModifiedWithinRadio.IsChecked == true ? -value : value;
+                var direction = LastModifiedDirection.SelectedIndex == 1
+                    ? DateFilterHelper.FilterDirection.WithinLast
+                    : DateFilterHelper.FilterDirection.OlderThan;
+                _workingCopy.DateFilter = DateFilterHelper.Format(DateFilterHelper.FilterType.LastModified, direction, value);
             }
             else
             {
-                MessageBox.Show("Last Modified value must be a non-zero number.", "Validation Error",
+                MessageBox.Show("Last Modified value must be a number between 1 and 5256000.", "Validation Error",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
         }
         else if (AgeCreatedRadio.IsChecked == true)
         {
-            if (int.TryParse(AgeCreatedMinsTextBox.Text, out int value) && value != 0)
+            if (int.TryParse(AgeCreatedMinsTextBox.Text, out int value) && value != 0 && value >= 1 && value <= 5256000)
             {
-                _workingCopy.AgeCreatedMins = AgeCreatedWithinRadio.IsChecked == true ? -value : value;
+                var direction = AgeCreatedDirection.SelectedIndex == 1
+                    ? DateFilterHelper.FilterDirection.WithinLast
+                    : DateFilterHelper.FilterDirection.OlderThan;
+                _workingCopy.DateFilter = DateFilterHelper.Format(DateFilterHelper.FilterType.FileCreated, direction, value);
             }
             else
             {
-                MessageBox.Show("Age Created value must be a non-zero number.", "Validation Error",
+                MessageBox.Show("File Created value must be a number between 1 and 5256000.", "Validation Error",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -506,12 +779,10 @@ public partial class FileRuleEditorDialog : Window, INotifyPropertyChanged
         // Check if OTHERS extension requires date filter
         if (_workingCopy.IsAllExtensionRule())
         {
-            if (!_workingCopy.LastAccessedMins.HasValue &&
-                !_workingCopy.LastModifiedMins.HasValue &&
-                !_workingCopy.AgeCreatedMins.HasValue)
+            if (string.IsNullOrWhiteSpace(_workingCopy.DateFilter))
             {
                 MessageBox.Show(
-                    "Extension 'OTHERS' rules MUST have a date criteria.\n\nPlease select one of: Last Accessed, Last Modified, or Age Created.",
+                    "Extension 'OTHERS' rules MUST have a date filter.\n\nPlease select one of: Last Accessed, Last Modified, or File Created.",
                     "Validation Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -527,9 +798,7 @@ public partial class FileRuleEditorDialog : Window, INotifyPropertyChanged
         _originalRule.ScanIntervalMs = _workingCopy.ScanIntervalMs;
         _originalRule.FileExists = _workingCopy.FileExists;
         _originalRule.IsActive = _workingCopy.IsActive;
-        _originalRule.LastAccessedMins = _workingCopy.LastAccessedMins;
-        _originalRule.LastModifiedMins = _workingCopy.LastModifiedMins;
-        _originalRule.AgeCreatedMins = _workingCopy.AgeCreatedMins;
+        _originalRule.DateFilter = _workingCopy.DateFilter;
 
         EditedRule = _originalRule;
         DialogResult = true;

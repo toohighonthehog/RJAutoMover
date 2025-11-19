@@ -50,14 +50,17 @@ public class FileProcessorService
         if (_activityHistoryService == null)
         {
             // No history service - return current session only
+            _logger.Log(LogLevel.DEBUG, "ActivityHistoryService is null - returning current session only");
             return _recentActivityService.GetRecentActivitiesDisplay();
         }
 
         // Get current session activities (in-memory)
         var currentActivities = _recentActivityService.GetRecentActivitiesDisplay();
+        _logger.Log(LogLevel.DEBUG, $"GetActivitiesWithHistory: Current session has {currentActivities.Count} activities");
 
         // Get historical activities from database (from previous sessions)
         var historicalRecords = _activityHistoryService.GetRecentActivities(historyLimit);
+        _logger.Log(LogLevel.DEBUG, $"GetActivitiesWithHistory: Database returned {historicalRecords.Count} total records");
 
         // Filter out records from current session (they're already in currentActivities)
         var currentSessionId = _activityHistoryService.SessionId;
@@ -65,11 +68,13 @@ public class FileProcessorService
             .Where(r => r.SessionId != currentSessionId) // Only include records from OTHER sessions
             .Select(r => r.ToDisplayString(includeSession: true))
             .ToList();
+        _logger.Log(LogLevel.DEBUG, $"GetActivitiesWithHistory: After filtering current session, {historicalDisplay.Count} historical records remain");
 
         // Merge: current session activities first, then historical
         var combined = new List<string>();
         combined.AddRange(currentActivities);
         combined.AddRange(historicalDisplay);
+        _logger.Log(LogLevel.DEBUG, $"GetActivitiesWithHistory: Returning {combined.Count} total activities (limit={historyLimit})");
 
         return combined.Take(historyLimit).ToList();
     }
@@ -147,6 +152,9 @@ public class FileProcessorService
                 {
                     _logger.Log(LogLevel.INFO, $"Cleaned up {orphanedCount} orphaned transfer(s) that will no longer show as in-progress");
                 }
+
+                // Refresh gRPC server's recent items cache with historical data now that database is ready
+                _grpcServer?.RefreshHistoricalCache();
             }
             catch (Exception ex)
             {
@@ -1050,149 +1058,84 @@ public class FileProcessorService
     }
 
     /// <summary>
-    /// Checks if a file matches the date criteria specified in the rule.
-    /// Positive values = "older than" (file must be OLDER than X minutes)
-    /// Negative values = "within last" (file must be WITHIN last X minutes)
+    /// Checks if a file matches the date filter specified in the rule.
+    /// Format: "TYPE:SIGN:MINUTES" (e.g., "LA:+43200" = Last Accessed, older than 43200 minutes)
     /// </summary>
     /// <param name="filePath">Full path to the file</param>
-    /// <param name="rule">FileRule with optional date criteria</param>
-    /// <returns>True if file matches date criteria (or if no date criteria specified)</returns>
+    /// <param name="rule">FileRule with optional DateFilter</param>
+    /// <returns>True if file matches date filter (or if no date filter specified)</returns>
     private bool MatchesDateCriteria(string filePath, FileRule rule)
     {
-        // If no date criteria specified, file matches by default
-        if (!rule.LastAccessedMins.HasValue && !rule.LastModifiedMins.HasValue && !rule.AgeCreatedMins.HasValue)
+        // If no date filter specified, file matches by default
+        if (!rule.HasDateFilter)
         {
             return true;
         }
 
         try
         {
+            var parsed = RJAutoMoverShared.Helpers.DateFilterHelper.Parse(rule.DateFilter);
+            if (!parsed.IsValid)
+            {
+                _logger.Log(LogLevel.WARN, $"Invalid DateFilter for rule '{rule.Name}': {parsed.ErrorMessage}");
+                return false;
+            }
+
             var fileInfo = new FileInfo(filePath);
             var now = DateTime.Now;
 
-            // Check LastAccessedMins
-            // Positive = file accessed MORE than X minutes ago (older than)
-            // Negative = file accessed LESS than |X| minutes ago (within last)
-            if (rule.LastAccessedMins.HasValue)
+            // Get the appropriate timestamp based on filter type
+            DateTime fileTimestamp = parsed.Type switch
             {
-                var minutesSinceAccess = (now - fileInfo.LastAccessTime).TotalMinutes;
-                var criteriaValue = rule.LastAccessedMins.Value;
+                RJAutoMoverShared.Helpers.DateFilterHelper.FilterType.LastAccessed => fileInfo.LastAccessTime,
+                RJAutoMoverShared.Helpers.DateFilterHelper.FilterType.LastModified => fileInfo.LastWriteTime,
+                RJAutoMoverShared.Helpers.DateFilterHelper.FilterType.FileCreated => fileInfo.CreationTime,
+                _ => now
+            };
 
-                if (criteriaValue > 0)
-                {
-                    // Positive: file must be OLDER than X minutes
-                    if (minutesSinceAccess >= criteriaValue)
-                    {
-                        _logger.Log(LogLevel.TRACE, $"File matches LastAccessedMins criteria: {Path.GetFileName(filePath)} (accessed {minutesSinceAccess:F1} min ago, requires >= {criteriaValue} min [older than])");
-                        return true;
-                    }
-                    else
-                    {
-                        _logger.Log(LogLevel.TRACE, $"File does NOT match LastAccessedMins criteria: {Path.GetFileName(filePath)} (accessed {minutesSinceAccess:F1} min ago, requires >= {criteriaValue} min [older than])");
-                        return false;
-                    }
-                }
-                else
-                {
-                    // Negative: file must be WITHIN last |X| minutes
-                    var withinMinutes = Math.Abs(criteriaValue);
-                    if (minutesSinceAccess <= withinMinutes)
-                    {
-                        _logger.Log(LogLevel.TRACE, $"File matches LastAccessedMins criteria: {Path.GetFileName(filePath)} (accessed {minutesSinceAccess:F1} min ago, requires <= {withinMinutes} min [within last])");
-                        return true;
-                    }
-                    else
-                    {
-                        _logger.Log(LogLevel.TRACE, $"File does NOT match LastAccessedMins criteria: {Path.GetFileName(filePath)} (accessed {minutesSinceAccess:F1} min ago, requires <= {withinMinutes} min [within last])");
-                        return false;
-                    }
-                }
+            var minutesSince = (now - fileTimestamp).TotalMinutes;
+
+            // Check if file matches the filter criteria
+            bool matches;
+            if (parsed.Direction == RJAutoMoverShared.Helpers.DateFilterHelper.FilterDirection.OlderThan)
+            {
+                // File must be OLDER than X minutes
+                matches = minutesSince >= parsed.Minutes;
+            }
+            else
+            {
+                // File must be WITHIN last X minutes
+                matches = minutesSince <= parsed.Minutes;
             }
 
-            // Check LastModifiedMins
-            // Positive = file modified MORE than X minutes ago (older than)
-            // Negative = file modified LESS than |X| minutes ago (within last)
-            if (rule.LastModifiedMins.HasValue)
+            // Log the result
+            var typeStr = parsed.Type switch
             {
-                var minutesSinceModified = (now - fileInfo.LastWriteTime).TotalMinutes;
-                var criteriaValue = rule.LastModifiedMins.Value;
+                RJAutoMoverShared.Helpers.DateFilterHelper.FilterType.LastAccessed => "accessed",
+                RJAutoMoverShared.Helpers.DateFilterHelper.FilterType.LastModified => "modified",
+                RJAutoMoverShared.Helpers.DateFilterHelper.FilterType.FileCreated => "created",
+                _ => "unknown"
+            };
 
-                if (criteriaValue > 0)
-                {
-                    // Positive: file must be OLDER than X minutes
-                    if (minutesSinceModified >= criteriaValue)
-                    {
-                        _logger.Log(LogLevel.TRACE, $"File matches LastModifiedMins criteria: {Path.GetFileName(filePath)} (modified {minutesSinceModified:F1} min ago, requires >= {criteriaValue} min [older than])");
-                        return true;
-                    }
-                    else
-                    {
-                        _logger.Log(LogLevel.TRACE, $"File does NOT match LastModifiedMins criteria: {Path.GetFileName(filePath)} (modified {minutesSinceModified:F1} min ago, requires >= {criteriaValue} min [older than])");
-                        return false;
-                    }
-                }
-                else
-                {
-                    // Negative: file must be WITHIN last |X| minutes
-                    var withinMinutes = Math.Abs(criteriaValue);
-                    if (minutesSinceModified <= withinMinutes)
-                    {
-                        _logger.Log(LogLevel.TRACE, $"File matches LastModifiedMins criteria: {Path.GetFileName(filePath)} (modified {minutesSinceModified:F1} min ago, requires <= {withinMinutes} min [within last])");
-                        return true;
-                    }
-                    else
-                    {
-                        _logger.Log(LogLevel.TRACE, $"File does NOT match LastModifiedMins criteria: {Path.GetFileName(filePath)} (modified {minutesSinceModified:F1} min ago, requires <= {withinMinutes} min [within last])");
-                        return false;
-                    }
-                }
+            var directionStr = parsed.Direction == RJAutoMoverShared.Helpers.DateFilterHelper.FilterDirection.OlderThan
+                ? $"older than {parsed.Minutes} min"
+                : $"within last {parsed.Minutes} min";
+
+            if (matches)
+            {
+                _logger.Log(LogLevel.TRACE, $"File MATCHES DateFilter: {Path.GetFileName(filePath)} ({typeStr} {minutesSince:F1} min ago, requires {directionStr})");
+            }
+            else
+            {
+                _logger.Log(LogLevel.TRACE, $"File does NOT match DateFilter: {Path.GetFileName(filePath)} ({typeStr} {minutesSince:F1} min ago, requires {directionStr})");
             }
 
-            // Check AgeCreatedMins
-            // Positive = file created MORE than X minutes ago (older than)
-            // Negative = file created LESS than |X| minutes ago (within last)
-            if (rule.AgeCreatedMins.HasValue)
-            {
-                var minutesSinceCreation = (now - fileInfo.CreationTime).TotalMinutes;
-                var criteriaValue = rule.AgeCreatedMins.Value;
-
-                if (criteriaValue > 0)
-                {
-                    // Positive: file must be OLDER than X minutes
-                    if (minutesSinceCreation >= criteriaValue)
-                    {
-                        _logger.Log(LogLevel.TRACE, $"File matches AgeCreatedMins criteria: {Path.GetFileName(filePath)} (created {minutesSinceCreation:F1} min ago, requires >= {criteriaValue} min [older than])");
-                        return true;
-                    }
-                    else
-                    {
-                        _logger.Log(LogLevel.TRACE, $"File does NOT match AgeCreatedMins criteria: {Path.GetFileName(filePath)} (created {minutesSinceCreation:F1} min ago, requires >= {criteriaValue} min [older than])");
-                        return false;
-                    }
-                }
-                else
-                {
-                    // Negative: file must be WITHIN last |X| minutes
-                    var withinMinutes = Math.Abs(criteriaValue);
-                    if (minutesSinceCreation <= withinMinutes)
-                    {
-                        _logger.Log(LogLevel.TRACE, $"File matches AgeCreatedMins criteria: {Path.GetFileName(filePath)} (created {minutesSinceCreation:F1} min ago, requires <= {withinMinutes} min [within last])");
-                        return true;
-                    }
-                    else
-                    {
-                        _logger.Log(LogLevel.TRACE, $"File does NOT match AgeCreatedMins criteria: {Path.GetFileName(filePath)} (created {minutesSinceCreation:F1} min ago, requires <= {withinMinutes} min [within last])");
-                        return false;
-                    }
-                }
-            }
-
-            return true; // Shouldn't reach here, but default to true
+            return matches;
         }
         catch (Exception ex)
         {
-            _logger.Log(LogLevel.DEBUG, $"Error checking date criteria for {Path.GetFileName(filePath)}: {ex.Message}");
-            return false; // If we can't check date criteria, don't process the file
+            _logger.Log(LogLevel.DEBUG, $"Error checking date filter for {Path.GetFileName(filePath)}: {ex.Message}");
+            return false; // If we can't check date filter, don't process the file
         }
     }
 
