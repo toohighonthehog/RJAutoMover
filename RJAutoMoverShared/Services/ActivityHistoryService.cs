@@ -843,6 +843,56 @@ public class ActivityHistoryService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Clears all transfer history from the database.
+    /// </summary>
+    /// <returns>The number of records deleted.</returns>
+    public int ClearAllHistory()
+    {
+        if (!_enabled || _connection == null) return 0;
+
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM Activities;";
+            int deleted = cmd.ExecuteNonQuery();
+
+            _logger.Log(LogLevel.INFO, $"Cleared all transfer history: {deleted} record(s) deleted");
+            return deleted;
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(LogLevel.ERROR, $"Failed to clear all history: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Clears transfer history for all sessions except the current one.
+    /// </summary>
+    /// <param name="currentSessionId">The session ID to keep (typically the current service session).</param>
+    /// <returns>The number of records deleted.</returns>
+    public int ClearPreviousSessions(string currentSessionId)
+    {
+        if (!_enabled || _connection == null) return 0;
+
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM Activities WHERE SessionId != @SessionId;";
+            cmd.Parameters.AddWithValue("@SessionId", currentSessionId);
+            int deleted = cmd.ExecuteNonQuery();
+
+            _logger.Log(LogLevel.INFO, $"Cleared previous session history: {deleted} record(s) deleted (kept session: {currentSessionId})");
+            return deleted;
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(LogLevel.ERROR, $"Failed to clear previous sessions: {ex.Message}");
+            throw;
+        }
+    }
+
     public void Dispose()
     {
         if (!_disposed)

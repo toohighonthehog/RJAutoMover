@@ -127,11 +127,14 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Recent Transfers" FontSize="14" FontWeight="Bold" Foreground="#357ABD" VerticalAlignment="Center"/>
 
                             <!-- Session Filter -->
-                            <ComboBox x:Name="SessionFilterComboBox" Grid.Column="2" Width="130" SelectionChanged="SessionFilter_Changed">
+                            <ComboBox x:Name="SessionFilterComboBox" Grid.Column="2" Width="130" SelectionChanged="SessionFilter_Changed"
+                                      VerticalContentAlignment="Center" Padding="8,4">
                                 <ComboBoxItem Content="All Sessions" IsSelected="True" Tag="All"/>
                                 <ComboBoxItem Content="Current Session" Tag="Current"/>
                                 <ComboBoxItem Content="Previous Sessions" Tag="Previous"/>
@@ -145,7 +148,30 @@
                                      GotFocus="TransfersSearchTextBox_GotFocus"
                                      LostFocus="TransfersSearchTextBox_LostFocus"/>
 
-                            <Button x:Name="TransfersToggleButton" Grid.Column="6" Content="Pause Processing" Padding="15,6" MinWidth="120" Click="TransfersToggleButton_Click">
+                            <!-- Clear History Button -->
+                            <Button x:Name="ClearHistoryButton" Grid.Column="6" Content="Clear History" Padding="12,6" MinWidth="110" Click="ClearHistory_Click"
+                                    FontSize="11" Foreground="#666666" Background="#F5F5F5" BorderThickness="0" Cursor="Hand">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}" CornerRadius="3" Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#E8E8E8"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+
+                            <Button x:Name="TransfersToggleButton" Grid.Column="8" Content="Pause Processing" Padding="15,6" MinWidth="120" Click="TransfersToggleButton_Click">
                                 <Button.Style>
                                     <Style TargetType="Button">
                                         <Setter Property="Background" Value="#EEEEEE"/>
@@ -508,14 +534,16 @@
 
                             <!-- Log Source Selection -->
                             <ComboBox x:Name="LogSourceComboBox" Grid.Column="0" Width="150"
-                                      SelectionChanged="LogSourceComboBox_SelectionChanged">
+                                      SelectionChanged="LogSourceComboBox_SelectionChanged"
+                                      VerticalContentAlignment="Center" Padding="8,4">
                                 <ComboBoxItem Content="Service Logs" IsSelected="True" Tag="Service"/>
                                 <ComboBoxItem Content="Tray Logs" Tag="Tray"/>
                             </ComboBox>
 
                             <!-- Log Level Filter -->
                             <ComboBox x:Name="LogLevelFilterComboBox" Grid.Column="2" Width="120"
-                                      SelectionChanged="LogLevelFilter_Changed">
+                                      SelectionChanged="LogLevelFilter_Changed"
+                                      VerticalContentAlignment="Center" Padding="8,4">
                                 <ComboBoxItem Content="All Levels" IsSelected="True" Tag="ALL"/>
                                 <ComboBoxItem Content="ERROR" Tag="ERROR"/>
                                 <ComboBoxItem Content="WARN" Tag="WARN"/>

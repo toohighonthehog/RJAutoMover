@@ -1827,8 +1827,72 @@ public partial class AboutWindow : Window
 
     private void UpdateHeaderColor(string? iconName)
     {
-        // Header color is static - no need to update based on icon state
-        // The gradient is defined in XAML as HeaderGradient resource
+        if (HeaderBorder == null) return;
+
+        LinearGradientBrush gradient;
+
+        switch (iconName?.ToLowerInvariant())
+        {
+            case "error.ico":
+            case "stopped.ico":
+                // Red gradient for error states
+                gradient = new LinearGradientBrush
+                {
+                    StartPoint = new System.Windows.Point(0, 0),
+                    EndPoint = new System.Windows.Point(0, 1),
+                    GradientStops = new GradientStopCollection
+                    {
+                        new GradientStop(Color.FromRgb(0xE7, 0x4C, 0x3C), 0.0),  // #E74C3C
+                        new GradientStop(Color.FromRgb(0xC0, 0x39, 0x2B), 1.0)   // #C0392B
+                    }
+                };
+                break;
+
+            case "paused.ico":
+                // Yellow/Orange gradient for paused state
+                gradient = new LinearGradientBrush
+                {
+                    StartPoint = new System.Windows.Point(0, 0),
+                    EndPoint = new System.Windows.Point(0, 1),
+                    GradientStops = new GradientStopCollection
+                    {
+                        new GradientStop(Color.FromRgb(0xF3, 0x9C, 0x12), 0.0),  // #F39C12
+                        new GradientStop(Color.FromRgb(0xE6, 0x7E, 0x22), 1.0)   // #E67E22
+                    }
+                };
+                break;
+
+            case "waiting.ico":
+                // Light blue/gray gradient for waiting state
+                gradient = new LinearGradientBrush
+                {
+                    StartPoint = new System.Windows.Point(0, 0),
+                    EndPoint = new System.Windows.Point(0, 1),
+                    GradientStops = new GradientStopCollection
+                    {
+                        new GradientStop(Color.FromRgb(0x5D, 0xAD, 0xE2), 0.0),  // #5DADE2
+                        new GradientStop(Color.FromRgb(0x34, 0x98, 0xDB), 1.0)   // #3498DB
+                    }
+                };
+                break;
+
+            case "active.ico":
+            default:
+                // Default blue gradient for active/normal state
+                gradient = new LinearGradientBrush
+                {
+                    StartPoint = new System.Windows.Point(0, 0),
+                    EndPoint = new System.Windows.Point(0, 1),
+                    GradientStops = new GradientStopCollection
+                    {
+                        new GradientStop(Color.FromRgb(0x4A, 0x90, 0xE2), 0.0),  // #4A90E2
+                        new GradientStop(Color.FromRgb(0x35, 0x7A, 0xBD), 1.0)   // #357ABD
+                    }
+                };
+                break;
+        }
+
+        HeaderBorder.Background = gradient;
     }
 
     #region Transfers Tab Support Methods
@@ -2075,6 +2139,93 @@ public partial class AboutWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"Error toggling processing: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    /// <summary>
+    /// Handles the Clear History button click.
+    /// Prompts user to choose between clearing previous sessions only or all sessions.
+    /// </summary>
+    private async void ClearHistory_Click(object sender, RoutedEventArgs e)
+    {
+        var result = MessageBox.Show(
+            "What would you like to clear?\n\n" +
+            "• YES - Clear previous sessions only (keeps current session)\n" +
+            "• NO - Clear all sessions (including current session)\n" +
+            "• CANCEL - Don't clear anything",
+            "Clear Transfer History",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.Cancel)
+        {
+            return;
+        }
+
+        bool clearAllSessions = (result == MessageBoxResult.No);
+        string confirmMessage = clearAllSessions
+            ? "Are you sure you want to clear ALL transfer history?\n\nThis will delete all records including the current session and cannot be undone."
+            : "Are you sure you want to clear previous session history?\n\nThis will delete all records from previous sessions but keep the current session.";
+
+        var confirmResult = MessageBox.Show(
+            confirmMessage,
+            "Confirm Clear History",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (confirmResult != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            // Use the shared logger from the App
+            var logger = new RJAutoMoverShared.Services.LoggingService("RJAutoMoverTray");
+            var databasePath = System.IO.Path.Combine(
+                RJAutoMoverShared.Constants.Paths.GetSharedDataFolder(),
+                "ActivityHistory.db");
+
+            using var activityHistory = new RJAutoMoverShared.Services.ActivityHistoryService(
+                logger,
+                databasePath,
+                enabled: true);
+
+            int deletedCount;
+
+            if (clearAllSessions)
+            {
+                // Clear all sessions
+                deletedCount = activityHistory.ClearAllHistory();
+            }
+            else
+            {
+                // Clear only previous sessions (not current session)
+                string currentSessionId = _serviceStartTime != DateTime.MinValue
+                    ? _serviceStartTime.ToString("yyyyMMddHHmmss")
+                    : "";
+                deletedCount = activityHistory.ClearPreviousSessions(currentSessionId);
+            }
+
+            MessageBox.Show(
+                $"Successfully cleared {deletedCount} transfer record(s).",
+                "History Cleared",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            // Refresh the transfers display
+            if (_trayIconService != null)
+            {
+                await LoadInitialTransferHistory(_trayIconService);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Error clearing history: {ex.Message}",
+                "Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 
