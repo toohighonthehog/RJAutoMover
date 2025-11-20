@@ -14,6 +14,7 @@
 - [x] Why does memory usage increase? Can we put a limit?
 - [x] There does appear to be a problem with the tray not starting because it is incorrectly concluded the tray is already open.
 - [x] Change the order of the tabs to Transfers > Config > Logs > System > Version
+- [x] Update the .Net SDK to the latest version 10.
 
 ## In Progress / To Do
 
@@ -25,7 +26,6 @@
 - [f] Version tab slow to appear.
 - [r] Add a clear history button to the history tab.
 - [ ] Update packages (where appropriate - I think sqlite has an issue)
-- [x] Update the .Net SDK to the latest version 10.
 - [ ] We get the status icon in the tray briefly flickering red for no obvious reason.
 - [r] The text in dropdowns in Logs and Transfer don't appear to be vertically centered very well.
 - [ ] Depending on the application state, the usually blue band at the top should change colour to reflect the current state.  Make sure the background text is appropriately contrasted.
