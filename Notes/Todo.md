@@ -24,7 +24,7 @@
 - [r] Rename 'Job Config' tab to just 'Configuration'.
 - [r] .Net and Version tabs can be combined into a single Version tab, with two buttons (similar to the way job config is formatted) for .Net
 - [f] Version tab slow to appear - in addition, some other tabs can cause the application to pause/hang in an inconsistent way.
-- [r] Add a clear history button to the history tab.
+- [r] Add a clear history button to the history tab.  This shoud be a small icon to keep everything aligned.  If 'All Sessions' is selected, wipe all historic sessions (i.e. current sessions and historic sessions from the database).  If 'Previous Sessions' is selected, just clear the historic sessions (i.e. in the database).  If 'Current Session' is selected, grey out (dim) the clear history button.
 - [ ] Update packages (where appropriate - I think sqlite has an issue)
 - [ ] We get the status icon in the tray briefly flickering red for no obvious reason.  For diagnostic purproses, log all events which cause the icon to change where this isn't done already.
 - [r] The text in dropdowns in Logs and Transfer don't appear to be vertically centered very well.
