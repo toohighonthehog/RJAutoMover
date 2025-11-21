@@ -46,6 +46,7 @@ public partial class AboutWindow : Window
     private bool _sortAscending = false;
     private string _transfersSearchText = "";
     private string _selectedSessionFilter = "All";
+    private string? _currentIconName = null; // Track current icon for button state
 
     // Version checking timer
     private System.Windows.Threading.DispatcherTimer? _versionCheckTimer;
@@ -133,6 +134,14 @@ public partial class AboutWindow : Window
 
             // Subscribe to tab changes to refresh Version tab when opened
             TabControl.SelectionChanged += TabControl_SelectionChanged;
+
+            // Update button state after window is loaded and template is available
+            this.Loaded += (s, e) =>
+            {
+                // Ensure button state is correct after template is loaded
+                // This fixes the issue where the button color might be wrong on initial window open
+                UpdateTransfersToggleButton();
+            };
 
             // Load initial transfer history after window content is rendered
             // NOTE: Service start time is loaded in SetGrpcClient() which is called BEFORE this event
@@ -434,16 +443,34 @@ public partial class AboutWindow : Window
         {
             if (!string.IsNullOrEmpty(_errorStatus))
             {
-                // Check if this is a detailed config validation error (starts with "Configuration validation failed:")
-                bool isDetailedConfigError = _errorStatus.Contains("Configuration validation failed:");
+                // Check if this is a generic/vague status message without real error details
+                bool isGenericStatus = _errorStatus.Equals("Config Error", StringComparison.OrdinalIgnoreCase) ||
+                                       _errorStatus.Equals("Service Disconnected", StringComparison.OrdinalIgnoreCase) ||
+                                       _errorStatus.Equals("Service Error", StringComparison.OrdinalIgnoreCase) ||
+                                       (_errorStatus.ToLower().Contains("error") && _errorStatus.Length < 50 && !_errorStatus.Contains(":"));
 
-                if (isDetailedConfigError)
+                if (isGenericStatus)
                 {
-                    // Display the detailed validation errors with better formatting
-                    var lines = _errorStatus.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                    // For generic status messages, show them but emphasize checking logs for real error
+                    ErrorMessageText.Text = $"STATUS: {_errorStatus}\n\n" +
+                        "⚠ No detailed error information available from service.\n\n" +
+                        "CHECK LOGS FOR ACTUAL ERROR:\n" +
+                        "C:\\ProgramData\\RJAutoMover\\Logs\\\n\n" +
+                        "─────────────────────────────────────────────\n\n" +
+                        "POSSIBLE CAUSES (SPECULATIVE):\n" +
+                        "• Invalid configuration file (config.yaml)\n" +
+                        "• Missing or inaccessible folders\n" +
+                        "• Port conflicts (default ports: 60051, 60052)\n" +
+                        "• Insufficient permissions\n" +
+                        "• Service not running or crashed";
+                }
+                else
+                {
+                    // We have a real error message - show it prominently FIRST
+                    var errorLines = _errorStatus.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
                     var formattedLines = new List<string>();
 
-                    foreach (var line in lines)
+                    foreach (var line in errorLines)
                     {
                         var trimmed = line.Trim();
                         if (!string.IsNullOrEmpty(trimmed))
@@ -452,60 +479,49 @@ public partial class AboutWindow : Window
                         }
                     }
 
-                    ErrorMessageText.Text = string.Join("\n", formattedLines) + "\n\n" +
-                        "HOW TO FIX:\n" +
-                        "1. Open the configuration file:\n" +
-                        "   C:\\Program Files\\RJAutoMover\\config.yaml\n\n" +
-                        "2. Fix the errors listed above\n\n" +
-                        "3. Restart the RJAutoMoverService:\n" +
-                        "   • Press Win+R\n" +
-                        "   • Type: services.msc\n" +
-                        "   • Find 'RJAutoMover Service'\n" +
-                        "   • Right-click → Restart\n\n" +
-                        "Check service logs for more details:\n" +
-                        "C:\\ProgramData\\RJAutoMover\\Logs\\";
-                }
-                else
-                {
-                    // Check if this is a generic status message
-                    bool isGenericStatus = _errorStatus.Equals("Config Error", StringComparison.OrdinalIgnoreCase) ||
-                                           _errorStatus.Equals("Service Disconnected", StringComparison.OrdinalIgnoreCase) ||
-                                           _errorStatus.ToLower().Contains("error") && _errorStatus.Length < 50;
+                    var actualError = string.Join("\n", formattedLines);
 
-                    if (isGenericStatus)
+                    // Check if this is a config validation error for specialized fix instructions
+                    bool isDetailedConfigError = _errorStatus.Contains("Configuration validation failed:");
+
+                    if (isDetailedConfigError)
                     {
-                        // Show generic troubleshooting info for generic status messages
-                        ErrorMessageText.Text = $"Status: {_errorStatus}\n\n" +
-                            "The service is in an error state. Common causes include:\n\n" +
-                            "• Invalid configuration file (config.yaml)\n" +
-                            "• Missing or inaccessible folders\n" +
-                            "• Port conflicts (default ports: 60051, 60052)\n" +
-                            "• Insufficient permissions\n" +
-                            "• Service not running or crashed\n\n" +
-                            "Check the service log files for detailed error information:\n" +
+                        ErrorMessageText.Text = "ACTUAL ERROR:\n" + actualError + "\n\n" +
+                            "─────────────────────────────────────────────\n\n" +
+                            "HOW TO FIX:\n" +
+                            "1. Open the configuration file:\n" +
+                            "   C:\\Program Files\\RJAutoMover\\config.yaml\n\n" +
+                            "2. Fix the errors listed above\n\n" +
+                            "3. Restart the RJAutoMoverService:\n" +
+                            "   • Press Win+R\n" +
+                            "   • Type: services.msc\n" +
+                            "   • Find 'RJAutoMover Service'\n" +
+                            "   • Right-click → Restart\n\n" +
+                            "For more details, check service logs:\n" +
                             "C:\\ProgramData\\RJAutoMover\\Logs\\";
                     }
                     else
                     {
-                        // Display the specific error message
-                        var errorLines = _errorStatus.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-                        var formattedError = string.Join("\n", errorLines.Select(line => line.Trim()));
-                        ErrorMessageText.Text = formattedError + "\n\n" +
-                            "Check service logs for more details:\n" +
+                        ErrorMessageText.Text = "ACTUAL ERROR:\n" + actualError + "\n\n" +
+                            "─────────────────────────────────────────────\n\n" +
+                            "For more details, check service logs:\n" +
                             "C:\\ProgramData\\RJAutoMover\\Logs\\";
                     }
                 }
             }
             else
             {
-                ErrorMessageText.Text = "The service is in an error state, but no specific error message is available.\n\n" +
-                    "Common causes:\n" +
+                // No error status at all
+                ErrorMessageText.Text = "⚠ The service is in an error state, but no error message is available.\n\n" +
+                    "CHECK LOGS FOR ACTUAL ERROR:\n" +
+                    "C:\\ProgramData\\RJAutoMover\\Logs\\\n\n" +
+                    "─────────────────────────────────────────────\n\n" +
+                    "POSSIBLE CAUSES (SPECULATIVE):\n" +
                     "• Invalid configuration file (config.yaml)\n" +
                     "• Missing or inaccessible folders\n" +
-                    "• Port conflicts\n" +
-                    "• Insufficient permissions\n\n" +
-                    "Check the service log files for detailed error information:\n" +
-                    "C:\\ProgramData\\RJAutoMover\\Logs\\";
+                    "• Port conflicts (default ports: 60051, 60052)\n" +
+                    "• Insufficient permissions\n" +
+                    "• Service not running or crashed";
             }
         }
     }
@@ -1077,6 +1093,7 @@ public partial class AboutWindow : Window
                 "Hardcodet.NotifyIcon.Wpf",
                 "CommunityToolkit.Mvvm",
                 "Microsoft.Data.Sqlite",
+                "Microsoft.Extensions.Hosting.WindowsServices",
                 "YamlDotNet",
                 "Serilog",
                 "Serilog.Sinks.File"
@@ -1419,59 +1436,31 @@ public partial class AboutWindow : Window
     private string FormatInterval(int milliseconds)
     {
         if (milliseconds < 1000)
-            return $"{milliseconds} ms";
+            return $"{milliseconds:N0} ms";
 
-        var seconds = milliseconds / 1000;
+        var seconds = milliseconds / 1000.0;
         if (seconds < 60)
-            return $"{seconds} sec";
+            return $"{seconds:F0} sec";
 
-        var minutes = seconds / 60;
+        var minutes = seconds / 60.0;
         if (minutes < 60)
-            return $"{minutes} min";
+            return $"{minutes:F0} min";
 
-        var hours = minutes / 60;
-        return $"{hours} hr";
+        var hours = minutes / 60.0;
+        return $"{hours:F1} hr";
     }
 
+    /// <summary>
+    /// Returns the human-readable date filter description for a file rule.
+    /// Uses the DateFilterDescription property which is computed from the DateFilter property
+    /// via DateFilterHelper.GetDescription(). Returns null if no date filter is configured.
+    /// </summary>
     private string? FormatDateCriteria(FileRule rule)
     {
-        if (rule.LastAccessedMins.HasValue)
-        {
-            var value = rule.LastAccessedMins.Value;
-            if (value > 0)
-            {
-                return $"Last Accessed: older than {FormatMinutes(value)}";
-            }
-            else
-            {
-                return $"Last Accessed: within {FormatMinutes(Math.Abs(value))}";
-            }
-        }
-        else if (rule.LastModifiedMins.HasValue)
-        {
-            var value = rule.LastModifiedMins.Value;
-            if (value > 0)
-            {
-                return $"Last Modified: older than {FormatMinutes(value)}";
-            }
-            else
-            {
-                return $"Last Modified: within {FormatMinutes(Math.Abs(value))}";
-            }
-        }
-        else if (rule.AgeCreatedMins.HasValue)
-        {
-            var value = rule.AgeCreatedMins.Value;
-            if (value > 0)
-            {
-                return $"Age: older than {FormatMinutes(value)}";
-            }
-            else
-            {
-                return $"Age: within {FormatMinutes(Math.Abs(value))}";
-            }
-        }
-        return null;
+        // The DateFilterDescription property already provides the formatted description
+        // from DateFilterHelper.GetDescription(rule.DateFilter)
+        var description = rule.DateFilterDescription;
+        return string.IsNullOrEmpty(description) || description == "None" ? null : description;
     }
 
     private string FormatMinutes(int minutes)
@@ -1495,7 +1484,6 @@ public partial class AboutWindow : Window
     private List<string> _allLogLines = new();
     private string _currentLogSource = "Service";
     private string _currentLogLevel = "ALL";
-    private string _currentSearchText = "";
     private System.Windows.Threading.DispatcherTimer? _logUpdateTimer;
     private string _currentLogFile = "";
 
@@ -1517,32 +1505,6 @@ public partial class AboutWindow : Window
         }
     }
 
-    private void LogSearch_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
-    {
-        if (LogSearchTextBox.Foreground == System.Windows.Media.Brushes.Gray)
-            return; // Ignore if placeholder text
-
-        _currentSearchText = LogSearchTextBox.Text;
-        FilterAndDisplayLogs();
-    }
-
-    private void LogSearchTextBox_GotFocus(object sender, RoutedEventArgs e)
-    {
-        if (LogSearchTextBox.Text == "Search logs...")
-        {
-            LogSearchTextBox.Text = "";
-            LogSearchTextBox.Foreground = new SolidColorBrush(Color.FromRgb(51, 51, 51));
-        }
-    }
-
-    private void LogSearchTextBox_LostFocus(object sender, RoutedEventArgs e)
-    {
-        if (string.IsNullOrWhiteSpace(LogSearchTextBox.Text))
-        {
-            LogSearchTextBox.Text = "Search logs...";
-            LogSearchTextBox.Foreground = new SolidColorBrush(Color.FromRgb(153, 153, 153));
-        }
-    }
 
     private void LoadLogs()
     {
@@ -1707,12 +1669,6 @@ public partial class AboutWindow : Window
             }
         }
 
-        // Filter by search text with AND/OR logic
-        if (!string.IsNullOrWhiteSpace(_currentSearchText) && _currentSearchText != "Search logs...")
-        {
-            filteredLines = filteredLines.Where(line => MatchesSearchFilter(line, _currentSearchText));
-        }
-
         var filteredList = filteredLines.ToList();
 
         if (filteredList.Count == 0)
@@ -1725,32 +1681,6 @@ public partial class AboutWindow : Window
             filteredList.Reverse();
             LogTextBox.Text = string.Join(Environment.NewLine, filteredList);
         }
-    }
-
-    private bool MatchesSearchFilter(string line, string searchText)
-    {
-        // Split by | for OR groups
-        var orGroups = searchText.Split('|');
-
-        // If any OR group matches, the line matches
-        foreach (var orGroup in orGroups)
-        {
-            var trimmedGroup = orGroup.Trim();
-            if (string.IsNullOrWhiteSpace(trimmedGroup))
-                continue;
-
-            // Split by space for AND terms within this OR group
-            var andTerms = trimmedGroup.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-            // Check if all AND terms are present (case-insensitive)
-            bool allTermsMatch = andTerms.All(term =>
-                line.Contains(term.Trim(), StringComparison.OrdinalIgnoreCase));
-
-            if (allTermsMatch)
-                return true; // This OR group matched, so the line matches
-        }
-
-        return false; // No OR groups matched
     }
 
     /// <summary>
@@ -1832,9 +1762,21 @@ public partial class AboutWindow : Window
         return entries;
     }
 
+    /// <summary>
+    /// Updates the header color band based on the current service icon/state.
+    /// Also stores the icon name and triggers button state update.
+    ///
+    /// This method is called whenever the service state changes (via TrayIconService).
+    /// The icon name determines both the header color and whether the pause/resume button should be enabled.
+    /// </summary>
+    /// <param name="iconName">Current icon filename (e.g., "active.ico", "paused.ico", "error.ico")</param>
     private void UpdateHeaderColor(string? iconName)
     {
         if (HeaderBorder == null) return;
+
+        // Store current icon name for button state management
+        // This is used by UpdateTransfersToggleButton to determine if button should be enabled
+        _currentIconName = iconName;
 
         LinearGradientBrush gradient;
 
@@ -1887,6 +1829,9 @@ public partial class AboutWindow : Window
         }
 
         HeaderBorder.Background = gradient;
+
+        // Update button state whenever icon changes
+        UpdateTransfersToggleButton();
     }
 
     #region Transfers Tab Support Methods
@@ -2249,6 +2194,69 @@ public partial class AboutWindow : Window
     }
 
     /// <summary>
+    /// Handles the Clear Logs button click event.
+    /// Deletes ALL log files (not just old ones).
+    /// </summary>
+    private void ClearLogs_Click(object sender, RoutedEventArgs e)
+    {
+        var confirmResult = MessageBox.Show(
+            "Are you sure you want to delete ALL log files?\n\n" +
+            "This will permanently DELETE all log files.\n" +
+            "This action cannot be undone.",
+            "Confirm Delete Logs",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (confirmResult != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            // Get the log folder path
+            var logFolder = RJAutoMoverShared.Helpers.ConfigurationHelper.GetLogFolder();
+
+            if (!Directory.Exists(logFolder))
+            {
+                MessageBox.Show(
+                    "Log folder does not exist.",
+                    "No Logs Found",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            // Get all log files and delete them
+            var logFiles = Directory.GetFiles(logFolder, "*.log");
+
+            foreach (var logFile in logFiles)
+            {
+                try
+                {
+                    File.Delete(logFile);
+                }
+                catch (Exception ex)
+                {
+                    // Log the error but continue with other files
+                    System.Diagnostics.Debug.WriteLine($"Failed to delete log file {Path.GetFileName(logFile)}: {ex.Message}");
+                }
+            }
+
+            // Refresh the log display
+            LoadLogs();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Error deleting logs: {ex.Message}",
+                "Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    /// <summary>
     /// Updates the pause state and refreshes the toggle button text.
     /// Called by TrayIconService when the service's pause state changes.
     /// </summary>
@@ -2272,7 +2280,16 @@ public partial class AboutWindow : Window
     }
 
     /// <summary>
-    /// Updates the Transfers tab toggle button text based on the current pause state.
+    /// Updates the Transfers tab toggle button text and state based on the current pause state and icon.
+    /// Button is dimmed when service is not in a healthy state (error, stopped, or processing).
+    ///
+    /// UI Logic:
+    /// - Button text shows current action: "Pause..." (when active) or "Resume..." (when paused)
+    /// - Button color shows FUTURE state color (icon color after clicking):
+    ///   * Orange when active → will pause to orange icon
+    ///   * Blue when paused → will resume to blue icon
+    /// - Button is dimmed (opacity 0.5) and disabled when service is unhealthy (error, stopped, etc.)
+    /// - Button is enabled only for healthy states: paused.ico, waiting.ico, active.ico
     /// </summary>
     private void UpdateTransfersToggleButton()
     {
@@ -2281,28 +2298,28 @@ public partial class AboutWindow : Window
             var button = GetTransfersToggleButton();
             if (button != null)
             {
-                button.Content = _isProcessingPaused ? "Resume Processing" : "Pause Processing";
+                button.Content = _isProcessingPaused ? "Resume..." : "Pause...";
 
-                // Update button appearance for better visibility when paused
+                // Check if service is in a healthy state (paused or waiting/active)
+                // Healthy states allow pause/resume operations
+                bool isHealthyState = _currentIconName?.ToLowerInvariant() switch
+                {
+                    "paused.ico" => true,   // Service is paused (can resume)
+                    "waiting.ico" => true,  // Service is idle/waiting (can pause)
+                    "active.ico" => true,   // Service is processing files (can pause)
+                    _ => false              // error.ico, stopped.ico, or any other state (cannot toggle)
+                };
+
+                // Disable button if not in healthy state
+                button.IsEnabled = isHealthyState;
+
+                // Adjust opacity for dimmed effect when disabled
+                button.Opacity = isHealthyState ? 1.0 : 0.5;
+
+                // Button color shows what the icon will become when clicked (FUTURE STATE COLOR)
                 if (_isProcessingPaused)
                 {
-                    // Orange/Yellow gradient for paused state
-                    button.Background = new LinearGradientBrush
-                    {
-                        StartPoint = new System.Windows.Point(0, 0),
-                        EndPoint = new System.Windows.Point(0, 1),
-                        GradientStops = new GradientStopCollection
-                        {
-                            new GradientStop(Color.FromRgb(0xF3, 0x9C, 0x12), 0.0),  // #F39C12
-                            new GradientStop(Color.FromRgb(0xE6, 0x7E, 0x22), 1.0)   // #E67E22
-                        }
-                    };
-                    button.Foreground = new SolidColorBrush(Colors.White);
-                    button.FontWeight = FontWeights.Bold;
-                }
-                else
-                {
-                    // Blue gradient for normal state (matches header)
+                    // Blue gradient - clicking will resume (blue icon)
                     button.Background = new LinearGradientBrush
                     {
                         StartPoint = new System.Windows.Point(0, 0),
@@ -2311,6 +2328,22 @@ public partial class AboutWindow : Window
                         {
                             new GradientStop(Color.FromRgb(0x4A, 0x90, 0xE2), 0.0),  // #4A90E2
                             new GradientStop(Color.FromRgb(0x35, 0x7A, 0xBD), 1.0)   // #357ABD
+                        }
+                    };
+                    button.Foreground = new SolidColorBrush(Colors.White);
+                    button.FontWeight = FontWeights.Bold;
+                }
+                else
+                {
+                    // Orange gradient - clicking will pause (orange icon)
+                    button.Background = new LinearGradientBrush
+                    {
+                        StartPoint = new System.Windows.Point(0, 0),
+                        EndPoint = new System.Windows.Point(0, 1),
+                        GradientStops = new GradientStopCollection
+                        {
+                            new GradientStop(Color.FromRgb(0xF3, 0x9C, 0x12), 0.0),  // #F39C12
+                            new GradientStop(Color.FromRgb(0xE6, 0x7E, 0x22), 1.0)   // #E67E22
                         }
                     };
                     button.Foreground = new SolidColorBrush(Colors.White);
@@ -2379,19 +2412,76 @@ public partial class AboutWindow : Window
                 // Disable button when "Current Session" is selected
                 ClearHistoryButton.IsEnabled = (tag != "Current");
 
-                // Update tooltip based on selection
+                // Update tooltip with detailed cleanup information based on selection
+                var tooltipPanel = new System.Windows.Controls.StackPanel { MaxWidth = 350 };
+
+                var titleBlock = new System.Windows.Controls.TextBlock
+                {
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 5)
+                };
+
+                var actionBlock = new System.Windows.Controls.TextBlock
+                {
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 8)
+                };
+
                 if (tag == "Current")
                 {
-                    ClearHistoryButton.ToolTip = "Cannot clear current session (switch filter to enable)";
+                    titleBlock.Text = "Clear Transfer History";
+                    actionBlock.Text = "Cannot clear current session - switch filter to 'All Sessions' or 'Previous Sessions' to enable this button.";
                 }
                 else if (tag == "All")
                 {
-                    ClearHistoryButton.ToolTip = "Clear all transfer history";
+                    titleBlock.Text = "Clear All Transfer History";
+                    actionBlock.Text = "Manually delete ALL transfer records from the database (including current session).";
                 }
                 else // "Previous"
                 {
-                    ClearHistoryButton.ToolTip = "Clear previous sessions only";
+                    titleBlock.Text = "Clear Previous Sessions";
+                    actionBlock.Text = "Manually delete transfer records from previous sessions only (keeps current session).";
                 }
+
+                tooltipPanel.Children.Add(titleBlock);
+                tooltipPanel.Children.Add(actionBlock);
+
+                // Add automatic cleanup explanation (same for all modes)
+                var autoCleanupTitle = new System.Windows.Controls.TextBlock
+                {
+                    FontWeight = FontWeights.SemiBold,
+                    Margin = new Thickness(0, 0, 0, 3),
+                    Text = "Automatic Cleanup:"
+                };
+                tooltipPanel.Children.Add(autoCleanupTitle);
+
+                var timeBasedBlock = new System.Windows.Controls.TextBlock
+                {
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 3),
+                    Text = "• Time-based: Records older than ActivityHistoryRetentionDays (default: 90 days) are auto-deleted on service startup"
+                };
+                tooltipPanel.Children.Add(timeBasedBlock);
+
+                var countBasedBlock = new System.Windows.Controls.TextBlock
+                {
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 3),
+                    Text = "• Count-based: When records exceed ActivityHistoryMaxRecords (default: 5000), oldest records are auto-deleted after each transfer"
+                };
+                tooltipPanel.Children.Add(countBasedBlock);
+
+                var noteBlock = new System.Windows.Controls.TextBlock
+                {
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 0),
+                    FontStyle = FontStyles.Italic,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
+                    Text = "Current session records are never auto-purged."
+                };
+                tooltipPanel.Children.Add(noteBlock);
+
+                ClearHistoryButton.ToolTip = new System.Windows.Controls.ToolTip { Content = tooltipPanel };
             }
         }
     }

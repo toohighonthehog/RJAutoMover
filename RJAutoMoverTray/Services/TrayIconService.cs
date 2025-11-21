@@ -343,19 +343,34 @@ public class TrayIconService
     private void OnStatusUpdated(object? sender, string status)
     {
         string oldStatus = _currentStatus;
-        _currentStatus = status;
+
+        // Parse status format: "Short message|||Detailed message"
+        string displayStatus = status;
+        string detailedError = status;
+
+        if (status.Contains("|||"))
+        {
+            var parts = status.Split(new[] { "|||" }, StringSplitOptions.None);
+            displayStatus = parts[0]; // Short message for tray icon
+            detailedError = parts.Length > 1 ? parts[1] : status; // Detailed message for Error tab
+            _currentStatus = displayStatus; // Store only the short message
+        }
+        else
+        {
+            _currentStatus = status;
+
+            // Legacy handling: Show generic message for validation errors in menu item
+            if (status.StartsWith("Configuration validation failed:", StringComparison.OrdinalIgnoreCase))
+            {
+                displayStatus = "Status: Configuration validation failed";
+            }
+        }
 
         if (_statusMenuItem != null)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                // Show generic message for validation errors in menu item
-                string displayStatus = status;
-                if (status.StartsWith("Configuration validation failed:", StringComparison.OrdinalIgnoreCase))
-                {
-                    displayStatus = "Configuration validation failed";
-                }
-                _statusMenuItem.Header = $"Status: {displayStatus}";
+                _statusMenuItem.Header = displayStatus.StartsWith("Status:") ? displayStatus : $"Status: {displayStatus}";
             });
         }
 
@@ -364,7 +379,7 @@ public class TrayIconService
 
         // Send tray state update to service if error state changed
         bool oldErrorState = IsInErrorState(oldStatus);
-        bool newErrorState = IsInErrorState(status);
+        bool newErrorState = IsInErrorState(_currentStatus);
 
         if (oldErrorState != newErrorState)
         {
@@ -377,6 +392,14 @@ public class TrayIconService
 
                 // Update About window if it's open to remove the error tab
                 _aboutWindow?.UpdateErrorStatus(null, false);
+            }
+            else
+            {
+                // Store detailed error for Error tab
+                _errorDetails = detailedError;
+
+                // Update About window if it's open to show the Error tab with detailed message
+                _aboutWindow?.UpdateErrorStatus(detailedError, true);
             }
 
             // Update menu item states when error state changes

@@ -45,7 +45,7 @@
     </AssemblyAttribute>
     <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
       <_Parameter1>PackageVersions</_Parameter1>
-      <_Parameter2>CommunityToolkit.Mvvm:8.4.0;Google.Protobuf:3.32.1;Grpc.AspNetCore:2.71.0;Grpc.Core:2.46.6;Grpc.Net.Client:2.71.0;Grpc.Tools:2.72.0;Hardcodet.NotifyIcon.Wpf:2.0.1;Microsoft.Data.Sqlite:7.0.20;Microsoft.Extensions.Hosting.WindowsServices:9.0.9;Serilog:4.3.0;Serilog.Sinks.File:7.0.0;YamlDotNet:16.3.0</_Parameter2>
+      <_Parameter2>CommunityToolkit.Mvvm:8.4.0;Google.Protobuf:3.33.1;Grpc.AspNetCore:2.71.0;Grpc.Core:2.46.6;Grpc.Net.Client:2.71.0;Grpc.Tools:2.76.0;Hardcodet.NotifyIcon.Wpf:2.0.1;Microsoft.Data.Sqlite:7.0.20;Microsoft.Extensions.Hosting.WindowsServices:10.0.0;Serilog:4.3.0;Serilog.Sinks.File:7.0.0;YamlDotNet:16.3.0</_Parameter2>
     </AssemblyAttribute>
   </ItemGroup>
 

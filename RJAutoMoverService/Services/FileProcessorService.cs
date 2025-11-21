@@ -243,8 +243,9 @@ public class FileProcessorService
 
                     // Re-validate config to get detailed error message
                     var detailedError = await GetConfigChangeErrorMessageAsync();
-                    OnStatusUpdated(detailedError);
-                    OnIconUpdated(IconNames.Error);
+
+                    // Notify tray of config error with detailed message
+                    NotifyConfigError(detailedError);
                 }
 
                 // If in config error mode, do nothing except wait
@@ -279,8 +280,6 @@ public class FileProcessorService
 
                                 // Re-validate config to get detailed error message
                                 var detailedError = await GetConfigChangeErrorMessageAsync();
-                                OnStatusUpdated(detailedError);
-                                OnIconUpdated(IconNames.Error);
 
                                 // Notify tray of config error with detailed message
                                 NotifyConfigError(detailedError);
@@ -427,8 +426,9 @@ public class FileProcessorService
 
                 // Re-validate config to get detailed error message
                 var detailedError = await GetConfigChangeErrorMessageAsync();
-                OnStatusUpdated(detailedError);
-                OnIconUpdated(IconNames.Error);
+
+                // Notify tray of config error with detailed message
+                NotifyConfigError(detailedError);
             }
             return;
         }
@@ -663,8 +663,9 @@ public class FileProcessorService
 
                                 // Re-validate config to get detailed error message
                                 var detailedError = await GetConfigChangeErrorMessageAsync();
-                                OnStatusUpdated(detailedError);
-                                OnIconUpdated(IconNames.Error);
+
+                                // Notify tray of config error with detailed message
+                                NotifyConfigError(detailedError);
                             }
 
                             // Mark this specific transfer as failed due to config change
@@ -692,8 +693,16 @@ public class FileProcessorService
 
                                 // Enter config error mode to stop all processing
                                 _configErrorMode = true;
-                                OnStatusUpdated("Database Error - Processing Stopped");
+
+                                // Notify tray with short status and detailed error message
+                                string dbErrorDetail = $"Database Error: Activity history write failed for file '{fileName}'.\n\n" +
+                                                      "Cannot move files without recording activity in the database. " +
+                                                      "This is a safety mechanism to ensure accountability.\n\n" +
+                                                      "Fix database issues and restart the service to resume processing.";
+                                OnStatusUpdated($"Status: Database Error|||{dbErrorDetail}");
                                 OnIconUpdated(IconNames.Error);
+                                OnRecentsUpdated(new List<string> { $"DATABASE ERROR: {dbErrorDetail}" });
+
                                 StopAllTimers();
                                 break;
                             }
@@ -734,8 +743,8 @@ public class FileProcessorService
 
                                 // Re-validate config to get detailed error message
                                 var detailedError = await GetConfigChangeErrorMessageAsync();
-                                OnStatusUpdated(detailedError);
-                                OnIconUpdated(IconNames.Error);
+
+                                // Notify tray of config error with detailed message
                                 NotifyConfigError(detailedError);
                             }
 
@@ -972,8 +981,13 @@ public class FileProcessorService
     {
         _logger.Log(LogLevel.INFO, $"FileProcessor notifying tray of config error: {errorMessage}");
 
-        // Send detailed error message to tray (will be displayed in Error tab)
-        OnStatusUpdated(errorMessage);
+        // Send short status message to tray icon, detailed message to Error tab
+        // The errorMessage contains the full details that will be shown in the Error tab
+        string shortStatus = errorMessage.Contains("changed")
+            ? "Config Changed"
+            : "Config Error";
+
+        OnStatusUpdated($"Status: {shortStatus}|||{errorMessage}"); // Short message|||Detailed message
         OnIconUpdated(IconNames.Error);
         OnRecentsUpdated(new List<string> { $"CONFIG ERROR: {errorMessage}" });
     }

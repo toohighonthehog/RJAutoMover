@@ -217,31 +217,4 @@ public static class DateFilterHelper
         var parsed = Parse(dateFilter);
         return (parsed.IsValid, parsed.ErrorMessage);
     }
-
-    /// <summary>
-    /// Migrates old format (nullable int properties) to new format
-    /// </summary>
-    public static string MigrateFromLegacyFormat(int? lastAccessedMins, int? lastModifiedMins, int? ageCreatedMins)
-    {
-        // Priority: LastAccessed > LastModified > AgeCreated (only one should be set)
-        if (lastAccessedMins.HasValue)
-        {
-            var direction = lastAccessedMins.Value > 0 ? FilterDirection.OlderThan : FilterDirection.WithinLast;
-            return Format(FilterType.LastAccessed, direction, Math.Abs(lastAccessedMins.Value));
-        }
-
-        if (lastModifiedMins.HasValue)
-        {
-            var direction = lastModifiedMins.Value > 0 ? FilterDirection.OlderThan : FilterDirection.WithinLast;
-            return Format(FilterType.LastModified, direction, Math.Abs(lastModifiedMins.Value));
-        }
-
-        if (ageCreatedMins.HasValue)
-        {
-            var direction = ageCreatedMins.Value > 0 ? FilterDirection.OlderThan : FilterDirection.WithinLast;
-            return Format(FilterType.FileCreated, direction, Math.Abs(ageCreatedMins.Value));
-        }
-
-        return string.Empty;
-    }
 }

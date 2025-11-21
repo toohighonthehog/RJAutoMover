@@ -18,6 +18,7 @@ public class ServiceWorker : BackgroundService
     private Configuration? _config;
     private readonly DateTime _startTime;
     private readonly System.Timers.Timer _memoryTimer;
+    private readonly System.Timers.Timer _logCleanupTimer;
     private bool _memoryErrorMode = false;
 
     public ServiceWorker(
@@ -38,6 +39,13 @@ public class ServiceWorker : BackgroundService
         _memoryTimer = new System.Timers.Timer(60000); // Default 1 minute
         _memoryTimer.Elapsed += LogMemoryUsage;
         _memoryTimer.AutoReset = true;
+
+        // Setup log cleanup timer (runs daily at 2:00 AM)
+        // This provides automatic cleanup of old log files in addition to the startup cleanup
+        // AutoReset = false ensures we recalculate the interval after each execution (always targets 2:00 AM next day)
+        _logCleanupTimer = new System.Timers.Timer(CalculateTimeUntil2AM());
+        _logCleanupTimer.Elapsed += PerformLogCleanup;
+        _logCleanupTimer.AutoReset = false; // Recalculate interval after each run to maintain 2:00 AM schedule
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -88,8 +96,9 @@ public class ServiceWorker : BackgroundService
                 }
             });
 
-            // Clean up old log files (older than 7 days)
-            _logger.CleanupOldLogs(7);
+            // Clean up old log files based on config retention setting
+            int retentionDays = _config?.Application.LogRetentionDays ?? 7;
+            _logger.CleanupOldLogs(retentionDays);
 
             // Force flush logs immediately
             await Task.Delay(100);
@@ -220,7 +229,12 @@ public class ServiceWorker : BackgroundService
                 // Update memory monitoring timer with config values
                 _memoryTimer.Interval = _config.Application.MemoryCheckMs;
                 _memoryTimer.Start();
-                _logger?.Log(LogLevel.INFO, $"Memory monitoring started (interval: {_config.Application.MemoryCheckMs}ms, limit: {_config.Application.MemoryLimitMb}MB)");
+
+                // Start log cleanup timer (runs daily at 2 AM)
+                _logCleanupTimer.Start();
+                _logger?.Log(LogLevel.INFO, $"Log cleanup scheduled daily at 2:00 AM (retention: {_config.Application.LogRetentionDays} days)");
+                var intervalSec = _config.Application.MemoryCheckMs / 1000.0;
+                _logger?.Log(LogLevel.INFO, $"Memory monitoring started (interval: {intervalSec:F0} seconds, limit: {_config.Application.MemoryLimitMb:N0} MB)");
 
                 // Send initial health check to tray
                 _ = Task.Run(async () => await SendHealthCheckToTrayAsync());
@@ -344,7 +358,7 @@ public class ServiceWorker : BackgroundService
 
             if (trayHealthy)
             {
-                _logger?.Log(LogLevel.DEBUG, $"Health check successful - Service uptime: {uptime:hh\\:mm\\:ss}, Memory: {memoryUsage}MB");
+                _logger?.Log(LogLevel.DEBUG, $"Health check successful - Service uptime: {uptime:hh\\:mm\\:ss}, Memory: {memoryUsage:N0} MB");
             }
             else
             {
@@ -368,7 +382,7 @@ public class ServiceWorker : BackgroundService
             // Simple memory monitoring - force GC if over 1GB
             if (memoryUsage > 1000)
             {
-                _logger?.Log(LogLevel.WARN, $"High memory usage: {memoryUsage}MB - running GC");
+                _logger?.Log(LogLevel.WARN, $"High memory usage: {memoryUsage:N0} MB - running GC");
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
@@ -390,7 +404,7 @@ public class ServiceWorker : BackgroundService
             var gcMemoryMB = GC.GetTotalMemory(false) / 1024 / 1024;
             var uptime = DateTime.Now - _startTime;
 
-            _logger?.Log(LogLevel.INFO, $"Memory Usage - Working Set: {workingSetMB}MB, Private: {privateMB}MB, GC: {gcMemoryMB}MB, Uptime: {uptime:hh\\:mm\\:ss}");
+            _logger?.Log(LogLevel.INFO, $"Memory Usage - Working Set: {workingSetMB:N0} MB, Private: {privateMB:N0} MB, GC: {gcMemoryMB:N0} MB, Uptime: {uptime:hh\\:mm\\:ss}");
 
             // Check for critical memory usage using configured limit
             var memoryLimitMb = _config?.Application.MemoryLimitMb ?? 512; // Default to 512 if config not loaded
@@ -400,7 +414,7 @@ public class ServiceWorker : BackgroundService
                 if (!_memoryErrorMode)
                 {
                     _memoryErrorMode = true;
-                    _logger?.Log(LogLevel.ERROR, $"CRITICAL: Memory limit exceeded ({workingSetMB}MB > {memoryLimitMb}MB) - entering error mode");
+                    _logger?.Log(LogLevel.ERROR, $"CRITICAL: Memory limit exceeded ({workingSetMB:N0} MB > {memoryLimitMb:N0} MB) - entering error mode");
                     _logger?.Log(LogLevel.ERROR, "Service entering memory error mode - all processing stopped");
                     _logger?.Log(LogLevel.ERROR, "Service restart required to recover from memory error");
 
@@ -411,17 +425,17 @@ public class ServiceWorker : BackgroundService
                     GC.Collect();
 
                     // Notify tray and file processor of memory error
-                    NotifyMemoryError($"Service memory usage exceeded {memoryLimitMb}MB limit: {workingSetMB}MB");
+                    NotifyMemoryError($"Service memory usage exceeded {memoryLimitMb:N0} MB limit: {workingSetMB:N0} MB");
                 }
                 else
                 {
-                    _logger?.Log(LogLevel.ERROR, $"Memory error mode active - current usage: {workingSetMB}MB (limit: {memoryLimitMb}MB)");
+                    _logger?.Log(LogLevel.ERROR, $"Memory error mode active - current usage: {workingSetMB:N0} MB (limit: {memoryLimitMb:N0} MB)");
                 }
             }
             else if (_memoryErrorMode)
             {
                 // Memory has dropped back below limit
-                _logger?.Log(LogLevel.INFO, $"Memory usage returned to normal: {workingSetMB}MB (limit: {memoryLimitMb}MB)");
+                _logger?.Log(LogLevel.INFO, $"Memory usage returned to normal: {workingSetMB:N0} MB (limit: {memoryLimitMb:N0} MB)");
                 _logger?.Log(LogLevel.INFO, "NOTE: Service restart still recommended after memory error");
             }
         }
@@ -454,6 +468,63 @@ public class ServiceWorker : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Calculates milliseconds until next 2:00 AM for log cleanup scheduling.
+    ///
+    /// Used to schedule the daily log cleanup timer. If current time is before 2:00 AM today,
+    /// returns time until 2:00 AM today. Otherwise, returns time until 2:00 AM tomorrow.
+    ///
+    /// Example: If called at 1:30 AM, returns ~30 minutes. If called at 3:00 PM, returns ~11 hours.
+    /// </summary>
+    /// <returns>Milliseconds until next 2:00 AM</returns>
+    private double CalculateTimeUntil2AM()
+    {
+        var now = DateTime.Now;
+        var next2AM = DateTime.Today.AddHours(2);
+
+        // If 2 AM has already passed today, schedule for tomorrow
+        if (now >= next2AM)
+        {
+            next2AM = next2AM.AddDays(1);
+        }
+
+        return (next2AM - now).TotalMilliseconds;
+    }
+
+    /// <summary>
+    /// Performs periodic log cleanup (runs daily at 2:00 AM via timer).
+    ///
+    /// This method:
+    /// 1. Cleans up old log files using LogRetentionDays from config
+    /// 2. Recalculates the timer interval to target 2:00 AM the next day
+    /// 3. Restarts the timer with the new interval
+    ///
+    /// If cleanup fails, retries in 1 hour instead of waiting until next day.
+    /// This complements the startup cleanup (ExecuteAsync) to ensure logs don't accumulate.
+    /// </summary>
+    private void PerformLogCleanup(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        try
+        {
+            int retentionDays = _config?.Application.LogRetentionDays ?? 7;
+            _logger?.Log(LogLevel.INFO, $"Performing scheduled log cleanup (retention: {retentionDays} days)");
+
+            _logger?.CleanupOldLogs(retentionDays);
+
+            // Recalculate interval for next day at 2 AM
+            _logCleanupTimer.Interval = CalculateTimeUntil2AM();
+            _logCleanupTimer.Start();
+        }
+        catch (Exception ex)
+        {
+            _logger?.Log(LogLevel.ERROR, $"Error during scheduled log cleanup: {ex.Message}");
+
+            // Try again in 1 hour if cleanup fails
+            _logCleanupTimer.Interval = TimeSpan.FromHours(1).TotalMilliseconds;
+            _logCleanupTimer.Start();
+        }
+    }
+
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.Log(LogLevel.INFO, "=== SERVICE SHUTDOWN INITIATED ===");
@@ -465,6 +536,11 @@ public class ServiceWorker : BackgroundService
             _memoryTimer?.Stop();
             _memoryTimer?.Dispose();
             _logger.Log(LogLevel.INFO, "Memory monitoring stopped");
+
+            // Stop log cleanup timer
+            _logCleanupTimer?.Stop();
+            _logCleanupTimer?.Dispose();
+            _logger.Log(LogLevel.INFO, "Log cleanup timer stopped");
 
             // Stop file processing immediately
             await _fileProcessor.StopProcessingAsync();

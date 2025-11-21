@@ -102,9 +102,22 @@ public class LoggingService
     }
 
     /// <summary>
-    /// Cleans up old log files
+    /// Cleans up OLD log files based on retention period (automatic cleanup only).
+    ///
+    /// This method performs AUTOMATIC cleanup (deletes OLD files only, not ALL files).
+    /// For manual cleanup (delete ALL files), see AboutWindow.ClearLogs_Click().
+    ///
+    /// Called in two scenarios:
+    /// 1. On service startup (ServiceWorker.ExecuteAsync) - cleans up logs from previous sessions
+    /// 2. Daily at 2:00 AM (ServiceWorker.PerformLogCleanup) - periodic maintenance cleanup
+    ///
+    /// Uses LastWriteTime (not CreationTime) to determine file age, which is more accurate for
+    /// log files that are continuously appended to. Protects current session logs by checking
+    /// if files are locked (in use) before deletion.
+    ///
+    /// Logs summary: "Cleaned up X log files older than Y days (Z in-use files skipped)"
     /// </summary>
-    /// <param name="daysToKeep">Number of days to keep log files (default: 7)</param>
+    /// <param name="daysToKeep">Number of days to keep log files (from config.Application.LogRetentionDays, default: 7)</param>
     public void CleanupOldLogs(int daysToKeep = 7)
     {
         try
@@ -115,14 +128,28 @@ public class LoggingService
             var cutoffDate = DateTime.Now.AddDays(-daysToKeep);
             var logFiles = Directory.GetFiles(_logPath, "*.log");
             var deletedCount = 0;
+            var skippedCount = 0;
 
             foreach (var logFile in logFiles)
             {
                 try
                 {
                     var fileInfo = new FileInfo(logFile);
-                    if (fileInfo.CreationTime < cutoffDate)
+
+                    // Use LastWriteTime instead of CreationTime for more accurate age detection
+                    // LastWriteTime reflects the most recent write to the file, which is more
+                    // accurate for continuously-appended log files
+                    if (fileInfo.LastWriteTime < cutoffDate)
                     {
+                        // Check if file is currently in use (current session log)
+                        // This protects logs from the current service session, even if they're old
+                        // (e.g., service has been running for 10+ days)
+                        if (IsFileLocked(logFile))
+                        {
+                            skippedCount++;
+                            continue; // Skip currently open log files
+                        }
+
                         File.Delete(logFile);
                         deletedCount++;
                     }
@@ -136,12 +163,48 @@ public class LoggingService
 
             if (deletedCount > 0)
             {
-                Log(LogLevel.INFO, $"Cleaned up {deletedCount} log files older than {daysToKeep} days");
+                Log(LogLevel.INFO, $"Cleaned up {deletedCount:N0} log files older than {daysToKeep} days{(skippedCount > 0 ? $" ({skippedCount} in-use files skipped)" : "")}");
             }
         }
         catch (Exception ex)
         {
             Log(LogLevel.ERROR, $"Log cleanup failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Checks if a file is currently locked (in use) by another process.
+    ///
+    /// This method protects current session log files from deletion during cleanup.
+    /// Attempts to open the file with exclusive access (FileShare.None). If this fails
+    /// with an IOException, the file is locked and should be skipped.
+    ///
+    /// Used by CleanupOldLogs() to avoid deleting log files that are actively being written to.
+    /// This ensures current session logs are never accidentally deleted, even if their LastWriteTime
+    /// is older than the retention period (e.g., service started days ago but still running).
+    /// </summary>
+    /// <param name="filePath">Full path to the log file to check</param>
+    /// <returns>True if file is locked (in use), false if accessible or on non-IO errors</returns>
+    private bool IsFileLocked(string filePath)
+    {
+        try
+        {
+            // Attempt to open with exclusive access (no sharing)
+            using (FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                return false; // Successfully opened = not locked
+            }
+        }
+        catch (IOException)
+        {
+            // File is locked (current session log or in use by another process)
+            return true;
+        }
+        catch
+        {
+            // Other errors (permissions, file not found, etc.) - assume file is accessible
+            // This prevents cleanup failures from blocking the entire process
+            return false;
         }
     }
 

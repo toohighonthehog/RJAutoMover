@@ -24,31 +24,8 @@ public class FileRule
     /// - "LM:+10080" = Files NOT modified in last 10080 minutes
     /// - "FC:+43200" = Files created more than 43200 minutes ago
     /// - "" or null = No date filter (process all files)
-    ///
-    /// This replaces the deprecated LastAccessedMins, LastModifiedMins, and AgeCreatedMins properties.
     /// </summary>
     public string DateFilter { get; set; } = string.Empty;
-
-    /// <summary>
-    /// DEPRECATED: Use DateFilter property instead. Kept for backward compatibility with old config files.
-    /// </summary>
-    [YamlIgnore]
-    [Obsolete("Use DateFilter property instead")]
-    public int? LastAccessedMins { get; set; } = null;
-
-    /// <summary>
-    /// DEPRECATED: Use DateFilter property instead. Kept for backward compatibility with old config files.
-    /// </summary>
-    [YamlIgnore]
-    [Obsolete("Use DateFilter property instead")]
-    public int? LastModifiedMins { get; set; } = null;
-
-    /// <summary>
-    /// DEPRECATED: Use DateFilter property instead. Kept for backward compatibility with old config files.
-    /// </summary>
-    [YamlIgnore]
-    [Obsolete("Use DateFilter property instead")]
-    public int? AgeCreatedMins { get; set; } = null;
 
     public List<string> GetExtensions()
     {

@@ -96,8 +96,8 @@
                             <TabPanel Grid.Column="0" IsItemsHost="True" Background="Transparent" HorizontalAlignment="Left"/>
 
                             <!-- Pause/Resume Button -->
-                            <Button x:Name="TransfersToggleButton" Grid.Column="1" Content="Pause Processing"
-                                    Padding="12,6" Width="160" Margin="0,0,0,4"
+                            <Button x:Name="TransfersToggleButton" Grid.Column="1" Content="Pause..."
+                                    Padding="12,6" Width="100" Margin="0,0,0,4"
                                     VerticalAlignment="Center"
                                     Click="TransfersToggleButton_Click">
                                 <Button.Style>
@@ -202,15 +202,12 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="10"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="10"/>
-                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Recent Transfers" FontSize="14" FontWeight="Bold" Foreground="#357ABD" VerticalAlignment="Center"/>
 
                             <!-- Session Filter -->
-                            <ComboBox x:Name="SessionFilterComboBox" Grid.Column="2" Width="150" SelectionChanged="SessionFilter_Changed"
+                            <ComboBox x:Name="SessionFilterComboBox" Grid.Column="0" Width="150" SelectionChanged="SessionFilter_Changed"
                                       VerticalContentAlignment="Center" Padding="8,4">
                                 <ComboBoxItem Content="All Sessions" IsSelected="True" Tag="All"/>
                                 <ComboBoxItem Content="Current Session" Tag="Current"/>
@@ -218,7 +215,7 @@
                             </ComboBox>
 
                             <!-- Search Box -->
-                            <TextBox x:Name="TransfersSearchTextBox" Grid.Column="4" Width="200"
+                            <TextBox x:Name="TransfersSearchTextBox" Grid.Column="2" Width="200"
                                      Padding="5" TextChanged="TransfersSearch_TextChanged"
                                      Text="Search transfers..."
                                      Foreground="#999999"
@@ -226,10 +223,29 @@
                                      LostFocus="TransfersSearchTextBox_LostFocus"/>
 
                             <!-- Clear History Button (small icon button) -->
-                            <Button x:Name="ClearHistoryButton" Grid.Column="6" Click="ClearHistory_Click"
+                            <Button x:Name="ClearHistoryButton" Grid.Column="4" Click="ClearHistory_Click"
                                     Width="24" Height="24" Padding="0"
-                                    Background="Transparent" BorderThickness="0" Cursor="Hand"
-                                    ToolTip="Clear transfer history">
+                                    Background="Transparent" BorderThickness="0" Cursor="Hand">
+                                <Button.ToolTip>
+                                    <ToolTip>
+                                        <StackPanel MaxWidth="350">
+                                            <TextBlock FontWeight="Bold" Margin="0,0,0,5">Clear Transfer History</TextBlock>
+                                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,8">
+                                                Manually delete transfer records from the database.
+                                            </TextBlock>
+                                            <TextBlock FontWeight="SemiBold" Margin="0,0,0,3">Automatic Cleanup:</TextBlock>
+                                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,3">
+                                                • Time-based: Records older than ActivityHistoryRetentionDays (default: 90 days) are auto-deleted on service startup
+                                            </TextBlock>
+                                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,3">
+                                                • Count-based: When records exceed ActivityHistoryMaxRecords (default: 5000), oldest records are auto-deleted after each transfer
+                                            </TextBlock>
+                                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,0" FontStyle="Italic" Foreground="#666666">
+                                                Current session records are never auto-purged.
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </ToolTip>
+                                </Button.ToolTip>
                                 <Button.Style>
                                     <Style TargetType="Button">
                                         <Setter Property="Template">
@@ -608,13 +624,52 @@
                                 <ComboBoxItem Content="gRPC" Tag="GRPC"/>
                             </ComboBox>
 
-                            <!-- Search Box -->
-                            <TextBox x:Name="LogSearchTextBox" Grid.Column="4" Width="200"
-                                     Padding="5" TextChanged="LogSearch_TextChanged"
-                                     Text="Search logs..."
-                                     Foreground="#999999"
-                                     GotFocus="LogSearchTextBox_GotFocus"
-                                     LostFocus="LogSearchTextBox_LostFocus"/>
+                            <!-- Clear Logs Button (small icon button) -->
+                            <Button x:Name="ClearLogsButton" Grid.Column="4" Click="ClearLogs_Click"
+                                    Width="24" Height="24" Padding="0"
+                                    Background="Transparent" BorderThickness="0" Cursor="Hand">
+                                <Button.ToolTip>
+                                    <ToolTip>
+                                        <StackPanel MaxWidth="350">
+                                            <TextBlock FontWeight="Bold" Margin="0,0,0,5">Delete All Log Files</TextBlock>
+                                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,8">
+                                                Manually delete ALL log files (including current session logs).
+                                            </TextBlock>
+                                            <TextBlock FontWeight="SemiBold" Margin="0,0,0,3">Automatic Cleanup:</TextBlock>
+                                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,3">
+                                                • Time-based: Log files older than LogRetentionDays (default: 7 days) are auto-deleted
+                                            </TextBlock>
+                                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,3">
+                                                • Runs on service startup and daily at 2:00 AM
+                                            </TextBlock>
+                                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,0" FontStyle="Italic" Foreground="#666666">
+                                                Note: Automatic cleanup only removes OLD files. Manual deletion removes ALL files.
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </ToolTip>
+                                </Button.ToolTip>
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}" CornerRadius="3">
+                                                        <TextBlock Text="🗑️" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                   Opacity="{TemplateBinding Opacity}"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Setter Property="Opacity" Value="0.5"/>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Opacity" Value="1.0"/>
+                                                <Setter Property="Background" Value="#F0F0F0"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                         </Grid>
 
                         <!-- Log Viewer -->

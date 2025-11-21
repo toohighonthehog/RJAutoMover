@@ -92,8 +92,28 @@ Persistent SQLite database tracks all file transfers across sessions:
 - **WAL mode**: Write-ahead logging for crash safety
 - **Session tracking**: Each service restart creates unique session ID (12-character GUID prefix)
 - **Accountability**: Service blocks transfers if database writes fail (no invisible operations)
-- **Auto-cleanup**: Purges records older than `ActivityHistoryRetentionDays`
+- **Auto-cleanup**: Two independent limits enforced
+  - **Time-based**: Purges records older than `ActivityHistoryRetentionDays` (default: 90 days)
+  - **Count-based**: Deletes oldest records when count exceeds `ActivityHistoryMaxRecords` (default: 5000)
+- **Master switch**: `ActivityHistoryEnabled` (default: true) - when false, no database logging occurs
 - **Implementation**: [ActivityHistoryService.cs](RJAutoMoverShared/Services/ActivityHistoryService.cs)
+
+**Activity History Settings:**
+- **ActivityHistoryEnabled** (default: true)
+  - Master switch for activity logging
+  - When true: All file transfers logged to database
+  - When false: No database operations, history not persisted
+  - All database methods check this flag before executing
+- **ActivityHistoryMaxRecords** (default: 5000)
+  - Limits total records in database (prevents unbounded growth)
+  - Enforced after every insert via `EnforceMaxRecords()`
+  - Deletes oldest records (by ID) when limit exceeded
+  - Works independently of time-based retention
+- **ActivityHistoryRetentionDays** (default: 90)
+  - Time-based record purging
+  - Runs on service startup (once per session)
+  - Deletes records older than specified days
+  - Works independently of count-based limit
 
 ### Logging System
 
@@ -103,9 +123,34 @@ Logs use Serilog with automatic rotation and retention:
 - **Service logs**: `YYYY-MM-DD-HH-mm-ss RJAutoMoverService.log`
 - **Tray logs**: `YYYY-MM-DD-HH-mm-ss RJAutoMoverTray.log`
 - **Rotation**: Automatically creates new file every 10MB (`_001.log`, `_002.log`, etc.)
-- **Cleanup**: Old logs deleted on startup based on `LogRetentionDays` (default: 7 days)
+- **Cleanup**:
+  - **Automatic**: Runs on service startup + daily at 2:00 AM using `LogRetentionDays` (default: 7 days)
+    - Only removes files older than `LogRetentionDays`
+    - Protects current session logs (skips files currently in use)
+    - Uses `LastWriteTime` for accurate age detection
+  - **Manual**: Clear Logs button in tray application (Logs tab)
+    - Deletes **ALL** log files regardless of age (including current session logs)
+    - Triggered by user action only
 - **Shared access**: Tray can read Service logs without locking conflicts
 - **Implementation**: [LoggingService.cs](RJAutoMoverShared/Services/LoggingService.cs)
+
+**Cleanup Comparison (Automatic vs Manual):**
+- **Log cleanup (automatic)**: Deletes physical log files based on age (`LogRetentionDays`)
+  - Runs on startup + daily at 2:00 AM
+  - Only removes OLD files (older than `LogRetentionDays`)
+  - Skips currently open log files (current session protection)
+- **Log cleanup (manual)**: User-triggered via Clear Logs button
+  - Deletes **ALL** log files (no age restriction, including current session logs)
+  - Requires user confirmation
+- **Activity history cleanup (automatic)**: Purges database records
+  - Runs only on service startup (once per session)
+  - Two limits enforced: `ActivityHistoryRetentionDays` (time-based) and `ActivityHistoryMaxRecords` (count-based)
+  - Records from current session are never purged
+  - See Activity History Database section for details
+- **Activity history cleanup (manual)**: User-triggered via Clear History button
+  - Can clear all sessions, previous sessions, or is disabled for current session
+  - Controlled by session filter selection in Transfers tab
+  - Requires user confirmation
 
 gRPC messages are prefixed with `[gRPC>]` (outgoing) and `[gRPC<]` (incoming) for easy filtering.
 
@@ -148,10 +193,6 @@ FileRules support an optional `DateFilter` property with format: `"TYPE:SIGN:MIN
 - **Single filter**: Only one DateFilter per rule (format prevents conflicts)
 - **Extension "OTHERS"**: Catch-all rules that match any file type MUST have a DateFilter
 - **Validation**: Format is validated by [DateFilterHelper.cs](RJAutoMoverShared/Helpers/DateFilterHelper.cs)
-
-**Legacy Format (Deprecated):**
-- Old properties `LastAccessedMins`, `LastModifiedMins`, `AgeCreatedMins` are deprecated
-- Use `DateFilterHelper.MigrateFromLegacyFormat()` to convert old configs
 
 See [TEST_PLAN_DATE_FILTERING.md](TEST_PLAN_DATE_FILTERING.md) for detailed testing scenarios.
 

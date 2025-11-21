@@ -43,14 +43,14 @@
     </AssemblyAttribute>
     <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
       <_Parameter1>PackageVersions</_Parameter1>
-      <_Parameter2>Grpc.AspNetCore:2.71.0;Microsoft.Extensions.Hosting.WindowsServices:9.0.9;YamlDotNet:16.3.0</_Parameter2>
+      <_Parameter2>Grpc.AspNetCore:2.71.0;Microsoft.Extensions.Hosting.WindowsServices:10.0.0;YamlDotNet:16.3.0</_Parameter2>
     </AssemblyAttribute>
   </ItemGroup>
 
 
   <ItemGroup>
     <PackageReference Include="Grpc.AspNetCore" Version="2.71.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
 

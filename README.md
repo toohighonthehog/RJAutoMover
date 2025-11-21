@@ -5,7 +5,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.9.6.91-blue.svg)](https://github.com/toohighonthehog/RJAutoMover)
+[![Version](https://img.shields.io/badge/version-0.9.6.105-blue.svg)](https://github.com/toohighonthehog/RJAutoMover)
 [![.NET](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/download/dotnet/10.0)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE.txt)
 
@@ -15,7 +15,7 @@
 
 ## 📥 Download & Install
 
-**[Download RJAutoMoverSetup.exe](https://github.com/toohighonthehog/RJAutoMover/blob/main/installer/RJAutoMoverSetup.exe)** (Version 0.9.6.91)
+**[Download RJAutoMoverSetup.exe](https://github.com/toohighonthehog/RJAutoMover/blob/main/installer/RJAutoMoverSetup.exe)** (Version 0.9.6.105)
 
 Simply run the installer with administrator privileges - it handles everything automatically, including service installation and configuration.
 
@@ -390,9 +390,9 @@ If `P:\` is mapped to `\\server\share`, the validator will:
 | `LogFolder` | Custom log folder path (optional) | Any valid folder path | `.\Logs` |
 | `LogRetentionDays` | Days to retain log files before cleanup | `1` - `365` | `7` |
 | `RequireTrayApproval` | Require tray approval before moves | `true` or `false` | `false` |
-| `ActivityHistoryEnabled` | Enable persistent activity database | `true` or `false` | `true` |
-| `ActivityHistoryMaxRecords` | Maximum records in database | `100` - `50000` | `5000` |
-| `ActivityHistoryRetentionDays` | Auto-purge records older than days | `1` - `365` | `90` |
+| `ActivityHistoryEnabled` | Master switch for activity logging (see below) | `true` or `false` | `true` |
+| `ActivityHistoryMaxRecords` | Maximum database records (see below) | `100` - `50000` | `5000` |
+| `ActivityHistoryRetentionDays` | Auto-purge records older than X days (see below) | `1` - `365` | `90` |
 
 **Application Configuration Validation Rules:**
 
@@ -437,8 +437,39 @@ DestinationFolder: <InstallingUserDocuments>\Sorted
 - **Location:** `C:\ProgramData\RJAutoMover\Data\ActivityHistory.db`
 - **Session tracking** - Each service restart creates a unique session ID
 - **Cross-user visibility** - All users can see complete transfer history
-- **Automatic cleanup** - Old records purged based on `ActivityHistoryRetentionDays`
+- **Automatic cleanup** - Two independent cleanup mechanisms (see below)
 - **Accountability** - If database writes fail, transfers are blocked to ensure no "invisible" operations
+
+**Activity History Configuration Settings:**
+
+1. **ActivityHistoryEnabled** (default: `true`)
+   - Master switch for the activity logging system
+   - When `true`: All file transfers are logged to the SQLite database
+   - When `false`: No database operations occur, transfer history is not persisted
+   - All database methods check this flag before executing
+   - If disabled, transfers still occur but are not recorded
+
+2. **ActivityHistoryMaxRecords** (default: `5000`)
+   - Limits the total number of records stored in the database
+   - Enforced **after every file transfer** via automatic cleanup
+   - When the count exceeds the limit, the oldest records (by insertion order) are deleted
+   - Prevents unbounded database growth with high transfer volumes
+   - Works independently of time-based retention
+   - Example: If set to 5000 and transfer #5001 occurs, the oldest record is deleted
+
+3. **ActivityHistoryRetentionDays** (default: `90`)
+   - Time-based record purging for historical data
+   - Runs **once on service startup** (not continuously)
+   - Deletes all records older than the specified number of days
+   - Works independently of count-based limit
+   - Example: If set to 90, records older than 90 days are deleted when the service starts
+
+**Cleanup Behavior:**
+- Both limits (`MaxRecords` and `RetentionDays`) are enforced independently
+- Records from the current service session are never purged
+- If `ActivityHistoryEnabled` is `false`, no cleanup occurs (database is not accessed)
+- Count-based cleanup is real-time (after every insert)
+- Time-based cleanup is on-demand (service startup only)
 
 **Autonomous Operation** allows the service to run without tray approval:
 
@@ -714,9 +745,30 @@ Logs are powered by **Serilog** for reliable, high-performance logging with auto
 
 **Automatic Log Management:**
 - ✅ **Automatic rotation** - New log file created every 10MB to prevent oversized files
-- ✅ **Automatic cleanup** - Old logs deleted on startup based on `LogRetentionDays` (default: 7 days)
+- ✅ **Automatic cleanup** - Old logs deleted based on `LogRetentionDays` (default: 7 days)
+  - Runs on service startup
+  - Runs daily at 2:00 AM via background timer
+  - Uses `LastWriteTime` to determine file age
+  - Protects current session logs (skips files currently in use)
+  - **Only removes OLD files** (older than `LogRetentionDays`)
+- ✅ **Manual cleanup** - Clear Logs button in tray application
+  - Deletes **ALL** log files regardless of age (including current session logs)
+  - Available in Logs tab of the About window
 - ✅ **Shared file access** - Tray can read Service logs in real-time without locking conflicts
 - ✅ **Buffered writes** - Optimized performance with 1-second flush interval
+
+**Log Cleanup vs Activity History Cleanup:**
+
+These are two separate systems with different purposes:
+
+| Feature | Log Cleanup (Automatic) | Log Cleanup (Manual) | Activity History Cleanup (Automatic) | Activity History Cleanup (Manual) |
+|---------|------------------------|---------------------|--------------------------------------|----------------------------------|
+| **What is cleaned** | Physical log files (.log) | Physical log files (.log) | Database records | Database records |
+| **When it runs** | Service startup + daily at 2:00 AM | When user clicks Clear Logs button | Service startup only | When user clicks Clear History button |
+| **What gets removed** | Files older than `LogRetentionDays` | **ALL log files** | Records older than `ActivityHistoryRetentionDays` OR exceeding `ActivityHistoryMaxRecords` | All/Previous sessions based on filter selection |
+| **Configuration** | `LogRetentionDays` (default: 7 days) | N/A - removes all | `ActivityHistoryRetentionDays` (90 days) + `ActivityHistoryMaxRecords` (5000) | N/A - user controlled |
+| **Age detection** | Uses file `LastWriteTime` | N/A - deletes all | Uses record timestamp | N/A - user controlled |
+| **Current session** | Protected (skips open files) | Deleted | Protected (never purged) | Can be cleared if "All Sessions" selected |
 
 **Log Contents:**
 - File operations (moves, errors, retries)

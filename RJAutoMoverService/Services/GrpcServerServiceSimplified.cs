@@ -408,7 +408,8 @@ public class GrpcServerServiceSimplified : TrayService.TrayServiceBase
                 dbStats = _fileProcessor.ActivityHistory.GetDatabaseStatistics();
             }
 
-            _logger.Log(LogLevel.gRPCOut, $"GetServiceSystemInfo response: memory={memoryUsageBytes / 1024.0 / 1024.0:F2}MB, uptime={uptimeMs}ms, dbRecords={dbStats?.TotalRecords ?? 0}");
+            var uptimeSec = uptimeMs / 1000.0;
+            _logger.Log(LogLevel.gRPCOut, $"GetServiceSystemInfo response: memory={memoryUsageBytes / 1024.0 / 1024.0:F2} MB, uptime={uptimeSec:F0} sec, dbRecords={dbStats?.TotalRecords ?? 0:N0}");
 
             return Task.FromResult(new ServiceSystemInfoResponse
             {
