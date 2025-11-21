@@ -20,7 +20,7 @@
 ## In Progress / To Do
 
 - 0.9.6
-- [r] Remove dark mode - we don't need it.
+- [x] Remove dark mode - we don't need it.
 - [r] System tab should be renamed to status.
 - [r] Runtime state (i.e. pause processing) is already in the transfers tab, so we can get rid of the runtime state tab.
 - [r] Rename 'Job Config' tab to just 'Configuration'.
