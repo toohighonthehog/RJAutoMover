@@ -218,6 +218,16 @@ public partial class AboutWindow : Window
     /// </summary>
     private async Task LoadDatabaseStatistics()
     {
+        // Yield immediately to allow UI to render
+        await System.Threading.Tasks.Task.Yield();
+
+        // Load service account in Status tab
+        var serviceAccount = await System.Threading.Tasks.Task.Run(() => GetServiceAccount());
+        if (StatusServiceAccountText != null)
+        {
+            StatusServiceAccountText.Text = serviceAccount;
+        }
+
         try
         {
             if (_trayIconService == null)
@@ -302,7 +312,7 @@ public partial class AboutWindow : Window
     /// <summary>
     /// Handles tab selection changes to refresh content when tabs are opened.
     /// </summary>
-    private async void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (e.Source is TabControl)
         {
@@ -316,7 +326,8 @@ public partial class AboutWindow : Window
             else if (selectedTab?.Header?.ToString() == "Status")
             {
                 // Load database statistics when Status tab is opened
-                await LoadDatabaseStatistics();
+                // Fire and forget - don't block tab switch
+                _ = LoadDatabaseStatistics();
             }
         }
     }
@@ -329,8 +340,8 @@ public partial class AboutWindow : Window
         // Yield immediately to allow UI to render
         await System.Threading.Tasks.Task.Yield();
 
-        // Refresh tray version
-        var (trayVersion, trayBuildDate) = GetTrayVersionInfo();
+        // Refresh tray version - run on background thread since it does file I/O
+        var (trayVersion, trayBuildDate) = await System.Threading.Tasks.Task.Run(() => GetTrayVersionInfo());
         TrayVersionText.Text = trayVersion;
         TrayBuildDateText.Text = trayBuildDate;
 
@@ -545,10 +556,6 @@ public partial class AboutWindow : Window
         var (serviceVersion, serviceBuildDate) = GetServiceVersionInfo();
         ServiceVersionText.Text = serviceVersion;
         ServiceBuildDateText.Text = serviceBuildDate;
-
-        // Service account
-        var serviceAccount = GetServiceAccount();
-        ServiceAccountText.Text = serviceAccount;
 
         // Check for updates (async, non-blocking)
         await CheckForUpdatesAsync(trayVersion, serviceVersion);
@@ -837,13 +844,13 @@ public partial class AboutWindow : Window
 
     private async System.Threading.Tasks.Task LoadServiceVersionInfo()
     {
-        // Service version
-        var (serviceVersion, serviceBuildDate) = GetServiceVersionInfo();
+        // Yield immediately to allow UI to render
+        await System.Threading.Tasks.Task.Yield();
+
+        // Service version - run on background thread since it does file I/O
+        var (serviceVersion, serviceBuildDate) = await System.Threading.Tasks.Task.Run(() => GetServiceVersionInfo());
         ServiceVersionText.Text = serviceVersion;
         ServiceBuildDateText.Text = serviceBuildDate;
-
-        // Service account
-        ServiceAccountText.Text = GetServiceAccount();
 
         // Check for updates
         if (!string.IsNullOrEmpty(serviceVersion) && serviceVersion != "Unknown" && serviceVersion != "Unavailable")
@@ -1863,19 +1870,6 @@ public partial class AboutWindow : Window
                 break;
 
             case "waiting.ico":
-                // Light blue/gray gradient for waiting state
-                gradient = new LinearGradientBrush
-                {
-                    StartPoint = new System.Windows.Point(0, 0),
-                    EndPoint = new System.Windows.Point(0, 1),
-                    GradientStops = new GradientStopCollection
-                    {
-                        new GradientStop(Color.FromRgb(0x5D, 0xAD, 0xE2), 0.0),  // #5DADE2
-                        new GradientStop(Color.FromRgb(0x34, 0x98, 0xDB), 1.0)   // #3498DB
-                    }
-                };
-                break;
-
             case "active.ico":
             default:
                 // Default blue gradient for active/normal state
@@ -2134,38 +2128,63 @@ public partial class AboutWindow : Window
 
         try
         {
+            // Toggle state immediately for responsive UI
+            _isProcessingPaused = !_isProcessingPaused;
+
+            // Update UI immediately before service call
+            UpdateTransfersToggleButton();
+
+            // Update icon and header color immediately
+            string newIcon = _isProcessingPaused ? "paused.ico" : "active.ico";
+            if (_trayIconService != null)
+            {
+                // Log the user-initiated icon change
+                var logger = new RJAutoMoverShared.Services.LoggingService("RJAutoMoverTray");
+                logger.Log(RJAutoMoverShared.Models.LogLevel.DEBUG,
+                    $"[ABOUTWINDOW] User clicked Pause/Resume - forcing icon to {newIcon} via reflection");
+
+                // Force icon update through reflection or direct access
+                var updateIconMethod = _trayIconService.GetType().GetMethod("UpdateIcon",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (updateIconMethod != null)
+                {
+                    updateIconMethod.Invoke(_trayIconService, new object[] { newIcon });
+                }
+            }
+
+            // Send request to service (this may take time)
             await _trayIconService.ToggleProcessing();
         }
         catch (Exception ex)
         {
+            // If service call fails, revert the UI changes
+            _isProcessingPaused = !_isProcessingPaused;
+            UpdateTransfersToggleButton();
+
             MessageBox.Show($"Error toggling processing: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     /// <summary>
     /// Handles the Clear History button click.
-    /// Prompts user to choose between clearing previous sessions only or all sessions.
+    /// Clears history based on current session filter selection.
     /// </summary>
     private async void ClearHistory_Click(object sender, RoutedEventArgs e)
     {
-        var result = MessageBox.Show(
-            "What would you like to clear?\n\n" +
-            "• YES - Clear previous sessions only (keeps current session)\n" +
-            "• NO - Clear all sessions (including current session)\n" +
-            "• CANCEL - Don't clear anything",
-            "Clear Transfer History",
-            MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Question);
+        // Determine what to clear based on current session filter
+        bool clearAllSessions = (_selectedSessionFilter == "All");
 
-        if (result == MessageBoxResult.Cancel)
+        string confirmMessage;
+        if (clearAllSessions)
         {
-            return;
+            confirmMessage = "Are you sure you want to clear ALL transfer history?\n\n" +
+                           "This will delete all records including the current session and cannot be undone.";
         }
-
-        bool clearAllSessions = (result == MessageBoxResult.No);
-        string confirmMessage = clearAllSessions
-            ? "Are you sure you want to clear ALL transfer history?\n\nThis will delete all records including the current session and cannot be undone."
-            : "Are you sure you want to clear previous session history?\n\nThis will delete all records from previous sessions but keep the current session.";
+        else // "Previous" filter
+        {
+            confirmMessage = "Are you sure you want to clear previous session history?\n\n" +
+                           "This will delete all records from previous sessions but keep the current session.";
+        }
 
         var confirmResult = MessageBox.Show(
             confirmMessage,
@@ -2241,30 +2260,61 @@ public partial class AboutWindow : Window
     }
 
     /// <summary>
+    /// Gets the TransfersToggleButton from the TabControl template.
+    /// </summary>
+    private Button? GetTransfersToggleButton()
+    {
+        if (TabControl?.Template != null)
+        {
+            return TabControl.Template.FindName("TransfersToggleButton", TabControl) as Button;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Updates the Transfers tab toggle button text based on the current pause state.
     /// </summary>
     private void UpdateTransfersToggleButton()
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            if (TransfersToggleButton != null)
+            var button = GetTransfersToggleButton();
+            if (button != null)
             {
-                TransfersToggleButton.Content = _isProcessingPaused ? "Resume Processing" : "Pause Processing";
+                button.Content = _isProcessingPaused ? "Resume Processing" : "Pause Processing";
 
                 // Update button appearance for better visibility when paused
                 if (_isProcessingPaused)
                 {
-                    // Yellow background with dark text for paused state
-                    TransfersToggleButton.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07)); // Yellow
-                    TransfersToggleButton.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)); // Dark text
-                    TransfersToggleButton.FontWeight = FontWeights.Bold;
+                    // Orange/Yellow gradient for paused state
+                    button.Background = new LinearGradientBrush
+                    {
+                        StartPoint = new System.Windows.Point(0, 0),
+                        EndPoint = new System.Windows.Point(0, 1),
+                        GradientStops = new GradientStopCollection
+                        {
+                            new GradientStop(Color.FromRgb(0xF3, 0x9C, 0x12), 0.0),  // #F39C12
+                            new GradientStop(Color.FromRgb(0xE6, 0x7E, 0x22), 1.0)   // #E67E22
+                        }
+                    };
+                    button.Foreground = new SolidColorBrush(Colors.White);
+                    button.FontWeight = FontWeights.Bold;
                 }
                 else
                 {
-                    // Gray background for normal state
-                    TransfersToggleButton.Background = new SolidColorBrush(Color.FromRgb(0xEE, 0xEE, 0xEE));
-                    TransfersToggleButton.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
-                    TransfersToggleButton.FontWeight = FontWeights.Normal;
+                    // Blue gradient for normal state (matches header)
+                    button.Background = new LinearGradientBrush
+                    {
+                        StartPoint = new System.Windows.Point(0, 0),
+                        EndPoint = new System.Windows.Point(0, 1),
+                        GradientStops = new GradientStopCollection
+                        {
+                            new GradientStop(Color.FromRgb(0x4A, 0x90, 0xE2), 0.0),  // #4A90E2
+                            new GradientStop(Color.FromRgb(0x35, 0x7A, 0xBD), 1.0)   // #357ABD
+                        }
+                    };
+                    button.Foreground = new SolidColorBrush(Colors.White);
+                    button.FontWeight = FontWeights.SemiBold;
                 }
             }
         });
@@ -2322,6 +2372,27 @@ public partial class AboutWindow : Window
         {
             _selectedSessionFilter = tag;
             RefreshTransfersDisplay();
+
+            // Enable/disable Clear History button based on session filter
+            if (ClearHistoryButton != null)
+            {
+                // Disable button when "Current Session" is selected
+                ClearHistoryButton.IsEnabled = (tag != "Current");
+
+                // Update tooltip based on selection
+                if (tag == "Current")
+                {
+                    ClearHistoryButton.ToolTip = "Cannot clear current session (switch filter to enable)";
+                }
+                else if (tag == "All")
+                {
+                    ClearHistoryButton.ToolTip = "Clear all transfer history";
+                }
+                else // "Previous"
+                {
+                    ClearHistoryButton.ToolTip = "Clear previous sessions only";
+                }
+            }
         }
     }
 
@@ -2423,9 +2494,10 @@ public partial class AboutWindow : Window
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            if (TransfersToggleButton != null)
+            var button = GetTransfersToggleButton();
+            if (button != null)
             {
-                TransfersToggleButton.IsEnabled = isEnabled;
+                button.IsEnabled = isEnabled;
             }
         });
     }

@@ -77,6 +77,85 @@
 
         <!-- Content Area with Tabs -->
         <TabControl x:Name="TabControl" Grid.Row="1" Margin="15,10,15,10" Background="Transparent" BorderThickness="0">
+            <TabControl.Template>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Tab Header Row with Button -->
+                        <Grid Grid.Row="0" Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Tab Headers -->
+                            <TabPanel Grid.Column="0" IsItemsHost="True" Background="Transparent" HorizontalAlignment="Left"/>
+
+                            <!-- Pause/Resume Button -->
+                            <Button x:Name="TransfersToggleButton" Grid.Column="1" Content="Pause Processing"
+                                    Padding="12,6" Width="160" Margin="0,0,0,4"
+                                    VerticalAlignment="Center"
+                                    Click="TransfersToggleButton_Click">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Background">
+                                            <Setter.Value>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                    <GradientStop Color="#4A90E2" Offset="0"/>
+                                                    <GradientStop Color="#357ABD" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                        <Setter Property="Cursor" Value="Hand"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background">
+                                                    <Setter.Value>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                            <GradientStop Color="#5BA0F2" Offset="0"/>
+                                                            <GradientStop Color="#4A90E2" Offset="1"/>
+                                                        </LinearGradientBrush>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Background">
+                                                    <Setter.Value>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                            <GradientStop Color="#CCCCCC" Offset="0"/>
+                                                            <GradientStop Color="#AAAAAA" Offset="1"/>
+                                                        </LinearGradientBrush>
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </Grid>
+
+                        <!-- Tab Content Area -->
+                        <ContentPresenter Grid.Row="1" ContentSource="SelectedContent"/>
+                    </Grid>
+                </ControlTemplate>
+            </TabControl.Template>
             <TabControl.Resources>
                 <Style TargetType="TabItem">
                     <Setter Property="Template">
@@ -127,13 +206,11 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="10"/>
-                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Recent Transfers" FontSize="14" FontWeight="Bold" Foreground="#357ABD" VerticalAlignment="Center"/>
 
                             <!-- Session Filter -->
-                            <ComboBox x:Name="SessionFilterComboBox" Grid.Column="2" Width="130" SelectionChanged="SessionFilter_Changed"
+                            <ComboBox x:Name="SessionFilterComboBox" Grid.Column="2" Width="150" SelectionChanged="SessionFilter_Changed"
                                       VerticalContentAlignment="Center" Padding="8,4">
                                 <ComboBoxItem Content="All Sessions" IsSelected="True" Tag="All"/>
                                 <ComboBoxItem Content="Current Session" Tag="Current"/>
@@ -148,53 +225,32 @@
                                      GotFocus="TransfersSearchTextBox_GotFocus"
                                      LostFocus="TransfersSearchTextBox_LostFocus"/>
 
-                            <!-- Clear History Button -->
-                            <Button x:Name="ClearHistoryButton" Grid.Column="6" Content="Clear History" Padding="12,6" MinWidth="110" Click="ClearHistory_Click"
-                                    FontSize="11" Foreground="#666666" Background="#F5F5F5" BorderThickness="0" Cursor="Hand">
+                            <!-- Clear History Button (small icon button) -->
+                            <Button x:Name="ClearHistoryButton" Grid.Column="6" Click="ClearHistory_Click"
+                                    Width="24" Height="24" Padding="0"
+                                    Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                    ToolTip="Clear transfer history">
                                 <Button.Style>
                                     <Style TargetType="Button">
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="Button">
-                                                    <Border Background="{TemplateBinding Background}" CornerRadius="3" Padding="{TemplateBinding Padding}">
-                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    <Border Background="{TemplateBinding Background}" CornerRadius="3">
+                                                        <TextBlock Text="🗑️" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                   Opacity="{TemplateBinding Opacity}"/>
                                                     </Border>
                                                 </ControlTemplate>
                                             </Setter.Value>
                                         </Setter>
+                                        <Setter Property="Opacity" Value="0.5"/>
                                         <Style.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#E8E8E8"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
-
-                            <Button x:Name="TransfersToggleButton" Grid.Column="8" Content="Pause Processing" Padding="15,6" MinWidth="120" Click="TransfersToggleButton_Click">
-                                <Button.Style>
-                                    <Style TargetType="Button">
-                                        <Setter Property="Background" Value="#EEEEEE"/>
-                                        <Setter Property="Foreground" Value="#333333"/>
-                                        <Setter Property="BorderThickness" Value="0"/>
-                                        <Setter Property="FontWeight" Value="Normal"/>
-                                        <Setter Property="Cursor" Value="Hand"/>
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border Background="{TemplateBinding Background}" CornerRadius="3" Padding="{TemplateBinding Padding}">
-                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#DDDDDD"/>
+                                                <Setter Property="Opacity" Value="1.0"/>
+                                                <Setter Property="Background" Value="#F0F0F0"/>
                                             </Trigger>
                                             <Trigger Property="IsEnabled" Value="False">
-                                                <Setter Property="Background" Value="#F5F5F5"/>
-                                                <Setter Property="Foreground" Value="#AAAAAA"/>
+                                                <Setter Property="Opacity" Value="0.2"/>
+                                                <Setter Property="Cursor" Value="Arrow"/>
                                             </Trigger>
                                         </Style.Triggers>
                                     </Style>
@@ -668,6 +724,8 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="5"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="5"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="120"/>
@@ -692,6 +750,11 @@
                                 <TextBlock Grid.Row="6" Grid.Column="0" Text="Service Uptime:"
                                            Style="{StaticResource InfoLabelStyle}"/>
                                 <TextBlock x:Name="ServiceUptimeText" Grid.Row="6" Grid.Column="1"
+                                           Style="{StaticResource InfoValueStyle}"/>
+
+                                <TextBlock Grid.Row="8" Grid.Column="0" Text="Run As:"
+                                           Style="{StaticResource InfoLabelStyle}"/>
+                                <TextBlock x:Name="StatusServiceAccountText" Grid.Row="8" Grid.Column="1"
                                            Style="{StaticResource InfoValueStyle}"/>
                             </Grid>
                         </Button>
@@ -910,8 +973,6 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="8"/>
                                     <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="8"/>
-                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="110"/>
@@ -942,11 +1003,6 @@
                                 <TextBlock Grid.Row="4" Grid.Column="0" Text="Build Date:"
                                            Style="{StaticResource InfoLabelStyle}"/>
                                 <TextBlock x:Name="ServiceBuildDateText" Grid.Row="4" Grid.Column="1"
-                                           Style="{StaticResource InfoValueStyle}"/>
-
-                                <TextBlock Grid.Row="6" Grid.Column="0" Text="Run As:"
-                                           Style="{StaticResource InfoLabelStyle}"/>
-                                <TextBlock x:Name="ServiceAccountText" Grid.Row="6" Grid.Column="1"
                                            Style="{StaticResource InfoValueStyle}"/>
                             </Grid>
                         </Button>

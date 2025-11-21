@@ -393,6 +393,9 @@ public class TrayIconService
     /// </summary>
     private void OnIconUpdated(object? sender, string iconName)
     {
+        _logger.Log(LogLevel.DEBUG,
+            $"[ICON UPDATE] Received icon update from service: {iconName}");
+
         _currentIconName = iconName;
         UpdateIcon(iconName);
 
@@ -580,13 +583,13 @@ public class TrayIconService
 
         if (!isConnected)
         {
-            _logger.Log(LogLevel.DEBUG, "Lost connection to service - updating tray to disconnected state");
+            _logger.Log(LogLevel.WARN, "[CONNECTION LOST] Lost connection to service - updating tray to disconnected state (stopped.ico)");
             UpdateIcon("stopped.ico");
             OnStatusUpdated(null, "Service Disconnected");
         }
         else
         {
-            _logger.Log(LogLevel.DEBUG, "Connected to service - tray will now receive status updates");
+            _logger.Log(LogLevel.INFO, "[CONNECTION ESTABLISHED] Connected to service - tray will now receive status updates");
 
             // Send initial tray state to service upon connection
             UpdateTrayState();
@@ -606,6 +609,18 @@ public class TrayIconService
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
+                string oldIcon = _currentIconName ?? "(none)";
+
+                // Log icon changes with caller information
+                var stackTrace = new System.Diagnostics.StackTrace(1, true);
+                var callerFrame = stackTrace.GetFrame(0);
+                string callerInfo = callerFrame != null
+                    ? $"{callerFrame.GetMethod()?.Name}:{callerFrame.GetFileLineNumber()}"
+                    : "Unknown";
+
+                _logger.Log(LogLevel.INFO,
+                    $"[ICON CHANGE] {oldIcon} → {iconName} | Caller: {callerInfo}");
+
                 _trayIcon.Icon = LoadIcon(iconName);
                 IconChanged?.Invoke(this, iconName);
             });
