@@ -3,18 +3,18 @@
 # ================================================================================
 # Generates predictions for test files based on test config
 # Simulates service decision logic to predict which rule processes each file
+# Saves to the versioned test folder created in Step 1
 #
 # Usage:
-#   .\3-Generate-Predictions.ps1
+#   .\3-Generate-Predictions.ps1 -TestRoot "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
 #
-# Output:
+# Output (in TestRoot):
 #   - test-predictions.yaml (expected outcomes for all test files)
 # ================================================================================
 
 param(
-    [string]$ManifestFile = "test-files-manifest.yaml",
-    [string]$ConfigFile = "test-config.yaml",
-    [string]$OutputPredictions = "test-predictions.yaml"
+    [Parameter(Mandatory=$true)]
+    [string]$TestRoot
 )
 
 # Color output functions
@@ -29,6 +29,19 @@ function Write-Section { param([string]$Title)
 }
 
 Write-Section "Step 3: Generate Predictions"
+
+# Validate TestRoot
+if (-not (Test-Path $TestRoot)) {
+    Write-Warning "Test root folder not found: $TestRoot"
+    Write-Info "Run 1-Generate-TestFiles.ps1 first to create the test folder"
+    exit 1
+}
+
+$ManifestFile = Join-Path $TestRoot "test-files-manifest.yaml"
+$ConfigFile = Join-Path $TestRoot "test-config.yaml"
+$OutputPredictions = Join-Path $TestRoot "test-predictions.yaml"
+
+Write-Info "Test Root: $TestRoot"
 Write-Info "Manifest: $ManifestFile"
 Write-Info "Config: $ConfigFile"
 Write-Info "Output: $OutputPredictions"
@@ -42,7 +55,7 @@ Write-Section "Loading Test Files Manifest"
 
 if (-not (Test-Path $ManifestFile)) {
     Write-Warning "Manifest file not found: $ManifestFile"
-    Write-Info "Run 1-Generate-TestFiles.ps1 first"
+    Write-Info "Run 1-Generate-TestFiles.ps1 and 2-Generate-TestConfig.ps1 first"
     exit 1
 }
 
@@ -305,9 +318,8 @@ foreach ($pred in $predictions) {
 }
 
 # Save predictions
-$predictionsPath = Join-Path (Get-Location) $OutputPredictions
-Set-Content -Path $predictionsPath -Value $yamlPredictions -Encoding UTF8
-Write-Success "Predictions saved: $predictionsPath"
+Set-Content -Path $OutputPredictions -Value $yamlPredictions -Encoding UTF8
+Write-Success "Predictions saved: $OutputPredictions"
 
 # ====================================================================================
 # Summary
@@ -315,7 +327,8 @@ Write-Success "Predictions saved: $predictionsPath"
 
 Write-Section "Summary"
 Write-Success "Step 3 Complete"
-Write-Info "Predictions file: $predictionsPath"
+Write-Info "Test Root: $TestRoot"
+Write-Info "Predictions file: $OutputPredictions"
 Write-Info "Expected coverage: $([Math]::Round(($stats.ExpectedMoves / $predictions.Count) * 100, 1))%"
 Write-Info ""
-Write-Info "Next step: Run 4-Deploy-And-Wait.ps1 (or manually deploy and run service)"
+Write-Info "Next step: Run 4-Deploy-And-Wait.ps1 -TestRoot '$TestRoot'"

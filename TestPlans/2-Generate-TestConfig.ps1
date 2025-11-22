@@ -2,18 +2,18 @@
 # RJAutoMover Test Config Generator - Step 2
 # ================================================================================
 # Generates test-config.yaml with non-overlapping rules covering ~85% of test files
+# Saves to the versioned test folder created in Step 1
 #
 # Usage:
-#   .\2-Generate-TestConfig.ps1
+#   .\2-Generate-TestConfig.ps1 -TestRoot "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
 #
-# Output:
+# Output (in TestRoot):
 #   - test-config.yaml (valid configuration for testing)
 # ================================================================================
 
 param(
-    [string]$ManifestFile = "test-files-manifest.yaml",
-    [string]$OutputConfig = "test-config.yaml",
-    [string]$BaseFolder = "C:\RJAutoMover_TestData"
+    [Parameter(Mandatory=$true)]
+    [string]$TestRoot
 )
 
 # Color output functions
@@ -28,8 +28,15 @@ function Write-Section { param([string]$Title)
 }
 
 Write-Section "Step 2: Generate Test Configuration"
-Write-Info "Manifest Input: $ManifestFile"
-Write-Info "Config Output: $OutputConfig"
+
+# Validate TestRoot
+if (-not (Test-Path $TestRoot)) {
+    Write-Warning "Test root folder not found: $TestRoot"
+    Write-Info "Run 1-Generate-TestFiles.ps1 first to create the test folder"
+    exit 1
+}
+
+Write-Info "Test Root: $TestRoot"
 Write-Info ""
 
 # ====================================================================================
@@ -168,9 +175,9 @@ foreach ($rule in $rules) {
   # $($rule.Name)
   # ==================================================================================
   - Name: "$($rule.Name)"
-    SourceFolder: "$BaseFolder\Source"
+    SourceFolder: "$TestRoot\Source"
     Extension: $($rule.Extension)
-    DestinationFolder: "$BaseFolder\Destination\$($rule.Destination)"
+    DestinationFolder: "$TestRoot\Destination\$($rule.Destination)"
     ScanIntervalMs: $($rule.ScanInterval)
     IsActive: true
     FileExists: $($rule.FileExists)
@@ -238,7 +245,7 @@ Application:
 "@
 
 # Save configuration
-$configPath = Join-Path (Get-Location) $OutputConfig
+$configPath = Join-Path $TestRoot "test-config.yaml"
 Set-Content -Path $configPath -Value $yamlConfig -Encoding UTF8
 Write-Success "Configuration saved: $configPath"
 
@@ -286,7 +293,8 @@ foreach ($othersRule in $othersRules) {
 
 Write-Section "Summary"
 Write-Success "Step 2 Complete"
+Write-Info "Test Root: $TestRoot"
 Write-Info "Rules created: $($rules.Count)"
 Write-Info "Config file: $configPath"
 Write-Info ""
-Write-Info "Next step: Run 3-Generate-Predictions.ps1"
+Write-Info "Next step: Run 3-Generate-Predictions.ps1 -TestRoot '$TestRoot'"

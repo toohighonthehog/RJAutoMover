@@ -1,21 +1,22 @@
 # ================================================================================
 # RJAutoMover Test Data Generator - Step 1
 # ================================================================================
-# Creates test files with realistic dates/times and generates manifest for predictions
+# Creates versioned test folder with test files and generates manifest for predictions
+# All test artifacts are isolated in C:\RJAutoMoverTest\testdata-<version>\
 #
 # Usage:
-#   .\1-Generate-TestFiles.ps1 -TotalFiles 1000
+#   .\1-Generate-TestFiles.ps1
+#   .\1-Generate-TestFiles.ps1 -TotalFiles 2000
 #
-# Output:
-#   - C:\RJAutoMover_TestData\Source\ (test files)
-#   - C:\RJAutoMover_TestData\Destination\* (empty folders)
-#   - test-files-manifest.yaml (file metadata for predictions)
+# Output (in versioned test folder):
+#   - Source\ (test files)
+#   - Destination\* (empty folders for each rule)
+#   - test-files-manifest.yaml (file metadata)
+#   - Logs\ (for test run logs)
 # ================================================================================
 
 param(
-    [string]$BaseFolder = "C:\RJAutoMover_TestData",
-    [int]$TotalFiles = 1000,
-    [string]$OutputManifest = "test-files-manifest.yaml"
+    [int]$TotalFiles = 1000
 )
 
 # Color output functions
@@ -29,25 +30,62 @@ function Write-Section { param([string]$Title)
     Write-Host "============================================================================" -ForegroundColor Yellow
 }
 
+# ====================================================================================
+# Create Versioned Test Folder
+# ====================================================================================
+
 Write-Section "Step 1: Generate Test Files + Manifest"
-Write-Info "Total Files: $TotalFiles"
-Write-Info "Base Folder: $BaseFolder"
-Write-Info "Manifest Output: $OutputManifest"
+
+# Read application version from installer\version.txt
+$versionFile = Join-Path $PSScriptRoot "..\installer\version.txt"
+if (Test-Path $versionFile) {
+    $appVersion = (Get-Content $versionFile -Raw).Trim()
+} else {
+    $appVersion = "0.0.0.0"
+    Write-Warning "Version file not found, using default: $appVersion"
+}
+
+# Generate versioned folder name: <appVersion>-<timestamp>
+$timestamp = Get-Date -Format "yyyyMMddHHmmss"
+$version = "$appVersion-$timestamp"
+$testRoot = "C:\RJAutoMoverTest\testdata-$version"
+
+Write-Info "Creating versioned test folder:"
+Write-Info "  App Version: $appVersion"
+Write-Info "  Timestamp: $timestamp"
+Write-Info "  Test Folder: testdata-$version"
+Write-Info "  Location: $testRoot"
+Write-Info "  Total Files: $TotalFiles"
 Write-Info ""
+
+# Create root test folder
+if (-not (Test-Path "C:\RJAutoMoverTest")) {
+    New-Item -Path "C:\RJAutoMoverTest" -ItemType Directory -Force | Out-Null
+}
+
+if (Test-Path $testRoot) {
+    Write-Warning "Test folder already exists, cleaning..."
+    Remove-Item $testRoot -Recurse -Force
+}
+
+New-Item -Path $testRoot -ItemType Directory -Force | Out-Null
+Write-Success "Test root created: $testRoot"
 
 # Define folder structure
 $folders = @{
-    "Source"       = "$BaseFolder\Source"
-    "DestRecent"   = "$BaseFolder\Destination\Recent"
-    "DestOld7Days" = "$BaseFolder\Destination\Old7Days"
-    "DestOld30Days"= "$BaseFolder\Destination\Old30Days"
-    "DestOld90Days"= "$BaseFolder\Destination\Old90Days"
-    "DestVideos"   = "$BaseFolder\Destination\Videos"
-    "DestImages"   = "$BaseFolder\Destination\Images"
-    "DestDocuments"= "$BaseFolder\Destination\Documents"
-    "DestArchives" = "$BaseFolder\Destination\Archives"
-    "DestCode"     = "$BaseFolder\Destination\Code"
-    "DestOthers"   = "$BaseFolder\Destination\Others"
+    "Source"       = "$testRoot\Source"
+    "DestRecent"   = "$testRoot\Destination\Recent"
+    "DestOld7Days" = "$testRoot\Destination\Old7Days"
+    "DestOld30Days"= "$testRoot\Destination\Old30Days"
+    "DestOld90Days"= "$testRoot\Destination\Old90Days"
+    "DestVideos"   = "$testRoot\Destination\Videos"
+    "DestImages"   = "$testRoot\Destination\Images"
+    "DestDocuments"= "$testRoot\Destination\Documents"
+    "DestArchives" = "$testRoot\Destination\Archives"
+    "DestCode"     = "$testRoot\Destination\Code"
+    "DestOthers"   = "$testRoot\Destination\Others"
+    "Logs"         = "$testRoot\Logs"
+    "Results"      = "$testRoot\Results"
 }
 
 # Extension groups
@@ -259,7 +297,7 @@ foreach ($file in $manifest) {
 }
 
 # Save manifest
-$manifestPath = Join-Path (Get-Location) $OutputManifest
+$manifestPath = Join-Path $testRoot "test-files-manifest.yaml"
 Set-Content -Path $manifestPath -Value $yamlContent -Encoding UTF8
 Write-Success "Manifest saved: $manifestPath"
 
@@ -269,8 +307,12 @@ Write-Success "Manifest saved: $manifestPath"
 
 Write-Section "Summary"
 Write-Success "Step 1 Complete"
+Write-Info "Test Root: $testRoot"
 Write-Info "Files created: $fileCounter"
 Write-Info "Source folder: $($folders["Source"])"
 Write-Info "Manifest: $manifestPath"
 Write-Info ""
-Write-Info "Next step: Run 2-Generate-TestConfig.ps1"
+Write-Info "IMPORTANT: Copy this test root path for use in subsequent steps:"
+Write-Host "   $testRoot" -ForegroundColor White
+Write-Info ""
+Write-Info "Next step: Run 2-Generate-TestConfig.ps1 -TestRoot '$testRoot'"

@@ -15,7 +15,8 @@ This testing framework provides a structured 5-step manual workflow to validate 
 - **Comprehensive:** Tests all DateFilter types (LA, LM, FC) and directions (+/-)
 - **Predictive:** Simulates service decision logic to predict outcomes before execution
 - **Diagnostic:** Integrates service log analysis for failure investigation
-- **Versioned:** All test runs are isolated in versioned result folders
+- **Fully Isolated:** Each test run is completely isolated in a versioned folder
+- **Archival:** Test runs can be preserved indefinitely for historical analysis
 
 ---
 
@@ -35,21 +36,25 @@ Navigate to the TestPlans folder and execute each step in order:
 ```powershell
 cd TestPlans
 
-# Step 1: Generate test files
+# Step 1: Generate test files (creates versioned folder)
 .\1-Generate-TestFiles.ps1
+# OUTPUT: C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045
+
+# Copy the test root path from Step 1 output
+$testRoot = "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
 
 # Step 2: Generate test configuration
-.\2-Generate-TestConfig.ps1
+.\2-Generate-TestConfig.ps1 -TestRoot $testRoot
 
 # Step 3: Generate predictions
-.\3-Generate-Predictions.ps1
+.\3-Generate-Predictions.ps1 -TestRoot $testRoot
 
 # Step 4: Deploy config and run service (MANUAL)
-.\4-Deploy-And-Wait.ps1
-# Follow on-screen instructions to deploy config, restart service, and wait
+.\4-Deploy-And-Wait.ps1 -TestRoot $testRoot
+# Follow on-screen instructions to deploy config, start service, and wait
 
 # Step 5: Analyze results
-.\5-Analyze-Results.ps1 -GenerateHTML
+.\5-Analyze-Results.ps1 -TestRoot $testRoot -GenerateHTML
 ```
 
 ---
@@ -60,14 +65,16 @@ cd TestPlans
 
 **Script:** `1-Generate-TestFiles.ps1`
 
-**Purpose:** Creates test files with controlled properties (extensions, timestamps, sizes) and generates a manifest for prediction analysis.
+**Purpose:** Creates a versioned test folder with test files, folder structure, and manifest for prediction analysis.
 
 **What It Does:**
-- Creates test data folder structure: `C:\RJAutoMover_TestData\Source` and `\Destination`
+- Reads application version from `installer\version.txt`
+- Creates versioned test folder: `C:\RJAutoMoverTest\testdata-<version>-<timestamp>`
+- Creates folder structure: `Source\`, `Destination\`, `Logs\`, `Results\`
 - Generates files across 24 age ranges (0 minutes to 365 days old)
 - Distributes files across 18 extension types (.txt, .pdf, .doc, .jpg, .mp4, etc.)
 - Sets realistic file timestamps (CreationTime, LastWriteTime, LastAccessTime)
-- Generates `test-files-manifest.yaml` with metadata for each file
+- Saves `test-files-manifest.yaml` in test root folder
 
 **Usage:**
 ```powershell
@@ -76,8 +83,10 @@ cd TestPlans
 ```
 
 **Output:**
-- `C:\RJAutoMover_TestData\Source\*.ext` (test files)
-- `test-files-manifest.yaml` (file metadata)
+- `C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045\` (versioned test folder)
+- `Source\*.ext` (test files in test folder)
+- `test-files-manifest.yaml` (in test root)
+- **Displays test root path for use in subsequent steps**
 
 ---
 
@@ -93,14 +102,15 @@ cd TestPlans
 - Rules cover all DateFilter scenarios (LM:-, LM:+, FC:-, FC:+, LA:+, no filter)
 - OTHERS rule includes mandatory DateFilter
 - Validates no extension clashes
+- Uses paths from the versioned test folder
 
 **Usage:**
 ```powershell
-.\2-Generate-TestConfig.ps1
+.\2-Generate-TestConfig.ps1 -TestRoot "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
 ```
 
 **Output:**
-- `test-config.yaml` (valid test configuration)
+- `test-config.yaml` (in test root folder)
 
 **Test Rules Created:**
 
@@ -126,8 +136,8 @@ cd TestPlans
 **Purpose:** Simulates the service's exact decision logic to predict which rule will process each file.
 
 **What It Does:**
-- Loads test files from manifest
-- Loads rules from test config
+- Loads test files from manifest (in test root)
+- Loads rules from test config (in test root)
 - **Simulates service logic:**
   - Process rules in correct order (specific extensions first, OTHERS last)
   - Match file extensions (case-insensitive)
@@ -137,11 +147,11 @@ cd TestPlans
 
 **Usage:**
 ```powershell
-.\3-Generate-Predictions.ps1
+.\3-Generate-Predictions.ps1 -TestRoot "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
 ```
 
 **Output:**
-- `test-predictions.yaml` (expected outcomes for all test files)
+- `test-predictions.yaml` (in test root folder)
 
 **Prediction Engine Logic:**
 
@@ -172,45 +182,51 @@ FOR EACH FILE:
 
 **What It Does:**
 - Validates test config and production paths exist
-- Provides step-by-step deployment instructions
+- Provides step-by-step deployment instructions with correct paths
 - Waits for user confirmation that deployment is complete
 - Validates deployment was successful
 - Reminds user to restore production config after testing
 
 **Usage:**
 ```powershell
-.\4-Deploy-And-Wait.ps1
+.\4-Deploy-And-Wait.ps1 -TestRoot "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
 ```
 
 **Manual Steps You Must Perform:**
 
-1. **Backup production config:**
+1. **Backup production config (if it exists):**
    ```powershell
-   Copy-Item 'C:\Program Files\RJAutoMover\config.yaml' 'config-backup.yaml' -Force
+   Copy-Item 'C:\Program Files\RJAutoMover\config.yaml' 'C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045\config-backup.yaml' -Force
    ```
 
-2. **Deploy test config:**
+2. **Copy test config to production location:**
    ```powershell
-   Copy-Item 'test-config.yaml' 'C:\Program Files\RJAutoMover\config.yaml' -Force
+   Copy-Item 'C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045\test-config.yaml' 'C:\Program Files\RJAutoMover\config.yaml' -Force
    ```
 
-3. **Restart the service:**
-   ```powershell
-   Restart-Service -Name 'RJAutoMoverService' -Force
-   ```
-   OR use `services.msc` (Win+R → services.msc)
+3. **Start the RJAutoMoverService executable:**
+   - Navigate to: `C:\Program Files\RJAutoMover`
+   - Run as Administrator: `RJAutoMoverService.exe`
+   - OR start via `services.msc` (Win+R → services.msc)
 
-4. **Verify service is running:**
+4. **Start the RJAutoMoverTray executable (optional but recommended):**
+   - Navigate to: `C:\Program Files\RJAutoMover`
+   - Run: `RJAutoMoverTray.exe`
+   - Tray icon provides real-time monitoring
+
+5. **Verify service is running:**
    ```powershell
    Get-Service -Name 'RJAutoMoverService'
    ```
+   OR check tray icon status
 
-5. **Monitor service logs:**
+6. **Monitor service logs:**
    ```powershell
    Get-Content 'C:\ProgramData\RJAutoMover\Logs\*RJAutoMoverService*.log' -Wait
    ```
+   OR view logs in tray application (Logs tab)
 
-6. **Wait for processing to complete:**
+7. **Wait for processing to complete:**
    - Watch logs for file move operations
    - Allow at least 2-3 minutes for scan cycles
    - Recommended: Wait 5-10 minutes for thorough processing
@@ -230,23 +246,23 @@ FOR EACH FILE:
 **Purpose:** Compare actual file locations against predictions, integrate service log analysis, and generate comprehensive exception reports.
 
 **What It Does:**
-- Scans source and destination folders for actual file locations
+- Scans source and destination folders for actual file locations (in test root)
 - Parses service logs for file operations, errors, and skipped files
 - Compares actual vs predicted outcomes for each file
 - Generates detailed YAML and optional HTML reports
-- Creates versioned results folder
+- Saves results to `Results\` folder in test root
 
 **Usage:**
 ```powershell
-.\5-Analyze-Results.ps1
-.\5-Analyze-Results.ps1 -GenerateHTML  # Create visual HTML report
-.\5-Analyze-Results.ps1 -Verbose       # Show all mismatches during analysis
+.\5-Analyze-Results.ps1 -TestRoot "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
+.\5-Analyze-Results.ps1 -TestRoot "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045" -GenerateHTML  # Create visual HTML report
+.\5-Analyze-Results.ps1 -TestRoot "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045" -Verbose       # Show all mismatches during analysis
 ```
 
 **Output:**
-- `Results\v{timestamp}\analysis-results.yaml` (full results)
-- `Results\v{timestamp}\exceptions.yaml` (failures only)
-- `Results\v{timestamp}\analysis-results.html` (optional visual report)
+- `Results\analysis-results.yaml` (full results in test root)
+- `Results\exceptions.yaml` (failures only in test root)
+- `Results\analysis-results.html` (optional visual report in test root)
 
 **Comparison Logic:**
 
@@ -293,7 +309,7 @@ Complete results for all test files:
 ```yaml
 AnalysisMetadata:
   GeneratedDate: "2025-11-22T14:30:00"
-  Version: "v202511221430"
+  TestRoot: "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
   TotalFiles: 1000
   Matches: 952
   Mismatches: 48
@@ -327,7 +343,7 @@ Failures only for quick diagnosis:
 ```yaml
 ExceptionMetadata:
   GeneratedDate: "2025-11-22T14:30:00"
-  Version: "v202511221430"
+  TestRoot: "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
   TotalExceptions: 48
   TotalFiles: 1000
   FailureRatePercent: 4.8
@@ -373,11 +389,11 @@ Get-Content "C:\ProgramData\RJAutoMover\Logs\*RJAutoMoverService*.log" -Tail 50
 **Common Causes:**
 - Invalid test-config.yaml (validation error)
 - Insufficient permissions on test data folder
-- Service account cannot access `C:\RJAutoMover_TestData`
+- Service account cannot access `C:\RJAutoMoverTest\testdata-*`
 
 **Solution:**
 1. Review service log for validation errors
-2. Grant service account read/write on `C:\RJAutoMover_TestData`
+2. Grant service account read/write on `C:\RJAutoMoverTest\testdata-*` folders
 3. Verify test-config.yaml syntax
 
 ---
@@ -390,7 +406,7 @@ Get-Content "C:\ProgramData\RJAutoMover\Logs\*RJAutoMoverService*.log" -Tail 50
 
 **Diagnosis:**
 ```powershell
-Get-Content "Results\v*\exceptions.yaml" | Select-String "MismatchReason"
+Get-Content "C:\RJAutoMoverTest\testdata-*\Results\exceptions.yaml" | Select-String "MismatchReason"
 ```
 
 **Common Causes:**
@@ -413,7 +429,7 @@ Get-Content "Results\v*\exceptions.yaml" | Select-String "MismatchReason"
 
 **Diagnosis:**
 ```powershell
-Test-Path "C:\RJAutoMover_TestData\Source\*"
+Test-Path "C:\RJAutoMoverTest\testdata-*\Source\*"
 Get-Content "C:\ProgramData\RJAutoMover\Logs\*RJAutoMoverService*.log" | Select-String "ERROR"
 ```
 
@@ -431,26 +447,18 @@ Get-Content "C:\ProgramData\RJAutoMover\Logs\*RJAutoMoverService*.log" | Select-
 
 ## Advanced Usage
 
-### Custom Test Data Locations
-
-Override default test data folder:
-
-```powershell
-.\1-Generate-TestFiles.ps1 -BaseFolder "D:\Tests\RJAutoMover"
-.\2-Generate-TestConfig.ps1 -BaseFolder "D:\Tests\RJAutoMover"
-# Steps 3-5 will automatically use manifest and config
-```
-
 ### Re-running Individual Steps
 
-You can re-run any step without affecting others:
+You can re-run any step using the same test root:
 
 ```powershell
+$testRoot = "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
+
 # Re-generate predictions after tweaking logic
-.\3-Generate-Predictions.ps1
+.\3-Generate-Predictions.ps1 -TestRoot $testRoot
 
 # Re-analyze results without re-running service
-.\5-Analyze-Results.ps1 -GenerateHTML
+.\5-Analyze-Results.ps1 -TestRoot $testRoot -GenerateHTML
 ```
 
 ### Generating Only HTML Report
@@ -458,7 +466,23 @@ You can re-run any step without affecting others:
 If you already have YAML results and want to add HTML:
 
 ```powershell
-.\5-Analyze-Results.ps1 -GenerateHTML
+.\5-Analyze-Results.ps1 -TestRoot $testRoot -GenerateHTML
+```
+
+### Running Multiple Test Variations
+
+Run multiple tests in parallel by creating separate test folders:
+
+```powershell
+# Create first test run
+.\1-Generate-TestFiles.ps1
+# OUTPUT: testdata-0.9.6.108-20251122153045
+
+# Create second test run (different parameters)
+.\1-Generate-TestFiles.ps1 -TotalFiles 2000
+# OUTPUT: testdata-0.9.6.108-20251122153101
+
+# Each test run is fully isolated
 ```
 
 ---
@@ -469,42 +493,82 @@ If you already have YAML results and want to add HTML:
 
 **IMPORTANT:** After testing, restore your production configuration:
 
-```powershell
-Stop-Service -Name 'RJAutoMoverService'
-Copy-Item 'config-backup.yaml' 'C:\Program Files\RJAutoMover\config.yaml' -Force
-Start-Service -Name 'RJAutoMoverService'
-```
+1. Stop RJAutoMoverService.exe (close or stop via services.msc)
+2. Stop RJAutoMoverTray.exe (close from system tray)
+3. Restore config:
+   ```powershell
+   $testRoot = "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
+   Copy-Item "$testRoot\config-backup.yaml" 'C:\Program Files\RJAutoMover\config.yaml' -Force
+   ```
+4. Restart RJAutoMoverService.exe
+5. Restart RJAutoMoverTray.exe
 
 ### Clean Up Test Data
 
-Remove test files and folders:
+Remove a specific test run:
 
 ```powershell
-Remove-Item 'C:\RJAutoMover_TestData' -Recurse -Force
+Remove-Item 'C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045' -Recurse -Force
+```
+
+Remove ALL test runs:
+
+```powershell
+Remove-Item 'C:\RJAutoMoverTest' -Recurse -Force
 ```
 
 ### Archive Test Results
 
-Move results to permanent storage:
+Versioned test folders are already self-contained and archived. You can:
 
+**Keep for reference:**
 ```powershell
-$latestResults = Get-ChildItem "Results" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-Copy-Item $latestResults.FullName "D:\TestArchive\$(Get-Date -Format 'yyyy-MM-dd')" -Recurse
+# Test folders remain at C:\RJAutoMoverTest\testdata-*
+# Each contains complete test artifacts, logs, and results
+```
+
+**Move to permanent storage:**
+```powershell
+Move-Item 'C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045' 'D:\TestArchive\' -Force
 ```
 
 ---
 
 ## Files Reference
 
+### Versioned Test Folder Structure
+
+```
+C:\RJAutoMoverTest\
+└── testdata-0.9.6.108-20251122153045\
+    ├── Source\                          (test files)
+    ├── Destination\                     (target folders)
+    │   ├── Recent\
+    │   ├── Old7Days\
+    │   ├── Old30Days\
+    │   └── ... (10 total destination folders)
+    ├── Logs\                            (empty until Step 4)
+    ├── Results\                         (analysis results from Step 5)
+    │   ├── analysis-results.yaml
+    │   ├── exceptions.yaml
+    │   └── analysis-results.html (if -GenerateHTML)
+    ├── test-files-manifest.yaml         (file metadata)
+    ├── test-config.yaml                 (test configuration)
+    ├── test-predictions.yaml            (predicted outcomes)
+    └── config-backup.yaml               (production config backup from Step 4)
+```
+
 ### Generated Test Artifacts
 
-| File | Purpose | Lifespan |
+| File | Purpose | Location |
 |------|---------|----------|
-| `test-files-manifest.yaml` | Test file metadata | Overwritten each run |
-| `test-config.yaml` | Test configuration | Overwritten each run |
-| `test-predictions.yaml` | Predicted outcomes | Overwritten each run |
-| `config-backup.yaml` | Production config backup | Overwritten each run |
-| `Results\v{timestamp}\*` | Test results | Persisted (versioned) |
+| `test-files-manifest.yaml` | Test file metadata | Test root |
+| `test-config.yaml` | Test configuration | Test root |
+| `test-predictions.yaml` | Predicted outcomes | Test root |
+| `config-backup.yaml` | Production config backup | Test root |
+| `Results\analysis-results.yaml` | Full results | Test root\Results |
+| `Results\exceptions.yaml` | Failures only | Test root\Results |
+| `Results\analysis-results.html` | Visual report | Test root\Results (optional) |
 
 ### Core Scripts
 
@@ -545,6 +609,15 @@ Copy-Item $latestResults.FullName "D:\TestArchive\$(Get-Date -Format 'yyyy-MM-dd
 
 ## Version History
 
+### v2.0 (November 22, 2025)
+
+**Major update - Versioned Test Folders:**
+- Complete test isolation in versioned folders (`testdata-<version>-<timestamp>`)
+- All artifacts (files, config, predictions, results, logs) in single folder
+- Test runs can be archived and preserved indefinitely
+- Multiple test runs can coexist without conflicts
+- Steps 2-5 accept `-TestRoot` parameter for folder specification
+
 ### v1.0 (November 22, 2025)
 
 **Initial release:**
@@ -552,7 +625,6 @@ Copy-Item $latestResults.FullName "D:\TestArchive\$(Get-Date -Format 'yyyy-MM-dd
 - Prediction engine with service logic simulation
 - YAML + HTML reporting
 - Service log integration
-- Versioned results folders
 - Manual deployment workflow (Step 4)
 
 **Test Coverage:**

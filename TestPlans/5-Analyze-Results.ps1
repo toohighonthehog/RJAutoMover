@@ -4,24 +4,22 @@
 # Compares actual file locations against predicted results
 # Integrates service log analysis for comprehensive diagnostics
 # Generates both YAML and HTML exception reports
+# Saves to the versioned test folder created in Step 1
 #
 # Usage:
-#   .\5-Analyze-Results.ps1
-#   .\5-Analyze-Results.ps1 -GenerateHTML
-#   .\5-Analyze-Results.ps1 -Verbose
+#   .\5-Analyze-Results.ps1 -TestRoot "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
+#   .\5-Analyze-Results.ps1 -TestRoot "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045" -GenerateHTML
+#   .\5-Analyze-Results.ps1 -TestRoot "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045" -Verbose
 #
-# Output:
-#   - Results\v{version}\analysis-results.yaml (detailed comparison)
-#   - Results\v{version}\analysis-results.html (visual report, if -GenerateHTML)
-#   - Results\v{version}\exceptions.yaml (failures only)
+# Output (in TestRoot\Results):
+#   - analysis-results.yaml (detailed comparison)
+#   - analysis-results.html (visual report, if -GenerateHTML)
+#   - exceptions.yaml (failures only)
 # ================================================================================
 
 param(
-    [string]$ManifestFile = "test-files-manifest.yaml",
-    [string]$PredictionsFile = "test-predictions.yaml",
-    [string]$TestDataFolder = "C:\RJAutoMover_TestData",
-    [string]$LogFolder = "C:\ProgramData\RJAutoMover\Logs",
-    [string]$ResultsFolder = "Results",
+    [Parameter(Mandatory=$true)]
+    [string]$TestRoot,
     [switch]$GenerateHTML,
     [switch]$Verbose
 )
@@ -38,10 +36,25 @@ function Write-Section { param([string]$Title)
     Write-Host "============================================================================" -ForegroundColor Yellow
 }
 
+# Validate TestRoot
+if (-not (Test-Path $TestRoot)) {
+    Write-Warning "Test root folder not found: $TestRoot"
+    Write-Info "Run 1-Generate-TestFiles.ps1 first to create the test folder"
+    exit 1
+}
+
+# Define file paths
+$ManifestFile = Join-Path $TestRoot "test-files-manifest.yaml"
+$PredictionsFile = Join-Path $TestRoot "test-predictions.yaml"
+$SourceFolder = Join-Path $TestRoot "Source"
+$DestinationFolder = Join-Path $TestRoot "Destination"
+$LogFolder = Join-Path $TestRoot "Logs"
+$ResultsFolder = Join-Path $TestRoot "Results"
+
 Write-Section "Step 5: Analyze Results"
+Write-Info "Test Root: $TestRoot"
 Write-Info "Manifest: $ManifestFile"
 Write-Info "Predictions: $PredictionsFile"
-Write-Info "Test Data: $TestDataFolder"
 Write-Info "Logs: $LogFolder"
 Write-Info ""
 
@@ -53,46 +66,29 @@ Write-Section "Pre-Flight Checks"
 
 if (-not (Test-Path $ManifestFile)) {
     Write-Error "Manifest file not found: $ManifestFile"
+    Write-Info "Run 2-Generate-TestConfig.ps1 and 3-Generate-Predictions.ps1 first"
     exit 1
 }
 Write-Success "Manifest found"
 
 if (-not (Test-Path $PredictionsFile)) {
     Write-Error "Predictions file not found: $PredictionsFile"
+    Write-Info "Run 3-Generate-Predictions.ps1 first"
     exit 1
 }
 Write-Success "Predictions found"
 
-if (-not (Test-Path $TestDataFolder)) {
-    Write-Error "Test data folder not found: $TestDataFolder"
+if (-not (Test-Path $SourceFolder)) {
+    Write-Error "Source folder not found: $SourceFolder"
     exit 1
 }
-Write-Success "Test data folder found"
+Write-Success "Source folder found"
 
-# ====================================================================================
-# Get Version from Config
-# ====================================================================================
-
-Write-Section "Determine Version"
-
-# Read version from test-config.yaml header comments
-$version = "unknown"
-if (Test-Path "test-config.yaml") {
-    $configContent = Get-Content "test-config.yaml" -Raw
-    if ($configContent -match 'Generated:\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})') {
-        $timestamp = $matches[1]
-        $version = "v" + ($timestamp -replace '[^\d]', '').Substring(0, 12)
-    }
+# Ensure results folder exists
+if (-not (Test-Path $ResultsFolder)) {
+    New-Item -Path $ResultsFolder -ItemType Directory -Force | Out-Null
 }
-
-Write-Info "Analysis version: $version"
-
-# Create versioned results folder
-$versionedFolder = Join-Path $ResultsFolder $version
-if (-not (Test-Path $versionedFolder)) {
-    New-Item -Path $versionedFolder -ItemType Directory -Force | Out-Null
-}
-Write-Success "Results folder: $versionedFolder"
+Write-Success "Results folder ready: $ResultsFolder"
 
 # ====================================================================================
 # Load Predictions
@@ -134,21 +130,18 @@ Write-Success "Loaded $($predictions.Count) predictions"
 
 Write-Section "Scanning Actual File Locations"
 
-$sourceFolder = Join-Path $TestDataFolder "Source"
-$destinationFolder = Join-Path $TestDataFolder "Destination"
-
 # Get all files in source
 $sourceFiles = @()
-if (Test-Path $sourceFolder) {
-    $sourceFiles = Get-ChildItem -Path $sourceFolder -File -Recurse | Select-Object -ExpandProperty Name
+if (Test-Path $SourceFolder) {
+    $sourceFiles = Get-ChildItem -Path $SourceFolder -File -Recurse | Select-Object -ExpandProperty Name
 }
 Write-Info "Files in source: $($sourceFiles.Count)"
 
 # Get all files in destination (recursively, tracking which subfolder)
 $destinationFiles = @{}
-if (Test-Path $destinationFolder) {
-    Get-ChildItem -Path $destinationFolder -File -Recurse | ForEach-Object {
-        $relativePath = $_.DirectoryName.Replace($destinationFolder, "").TrimStart("\")
+if (Test-Path $DestinationFolder) {
+    Get-ChildItem -Path $DestinationFolder -File -Recurse | ForEach-Object {
+        $relativePath = $_.DirectoryName.Replace($DestinationFolder, "").TrimStart("\")
         $destinationFiles[$_.Name] = $relativePath
     }
 }
@@ -352,7 +345,7 @@ $yamlReport = @"
 # RJAutoMover Test Analysis Results
 # ====================================================================================
 # Generated: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-# Version: $version
+# Test Root: $TestRoot
 # Total Files: $($stats.TotalFiles)
 # Matches: $($stats.Matches)
 # Mismatches: $($stats.Mismatches)
@@ -361,7 +354,7 @@ $yamlReport = @"
 
 AnalysisMetadata:
   GeneratedDate: "$(Get-Date -Format "yyyy-MM-ddTHH:mm:ss")"
-  Version: "$version"
+  TestRoot: "$TestRoot"
   TotalFiles: $($stats.TotalFiles)
   Matches: $($stats.Matches)
   Mismatches: $($stats.Mismatches)
@@ -394,7 +387,7 @@ foreach ($result in $results) {
 "@
 }
 
-$yamlReportPath = Join-Path $versionedFolder "analysis-results.yaml"
+$yamlReportPath = Join-Path $ResultsFolder "analysis-results.yaml"
 Set-Content -Path $yamlReportPath -Value $yamlReport -Encoding UTF8
 Write-Success "Full results saved: $yamlReportPath"
 
@@ -411,13 +404,13 @@ $exceptionsYaml = @"
 # RJAutoMover Test Exceptions (Failures Only)
 # ====================================================================================
 # Generated: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-# Version: $version
+# Test Root: $TestRoot
 # Total Exceptions: $($exceptions.Count)
 # ====================================================================================
 
 ExceptionMetadata:
   GeneratedDate: "$(Get-Date -Format "yyyy-MM-ddTHH:mm:ss")"
-  Version: "$version"
+  TestRoot: "$TestRoot"
   TotalExceptions: $($exceptions.Count)
   TotalFiles: $($stats.TotalFiles)
   FailureRatePercent: $([Math]::Round(($exceptions.Count / $stats.TotalFiles) * 100, 1))
@@ -438,7 +431,7 @@ foreach ($exc in $exceptions) {
 "@
 }
 
-$exceptionsYamlPath = Join-Path $versionedFolder "exceptions.yaml"
+$exceptionsYamlPath = Join-Path $ResultsFolder "exceptions.yaml"
 Set-Content -Path $exceptionsYamlPath -Value $exceptionsYaml -Encoding UTF8
 Write-Success "Exceptions saved: $exceptionsYamlPath"
 
@@ -455,7 +448,7 @@ if ($GenerateHTML) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RJAutoMover Test Analysis - $version</title>
+    <title>RJAutoMover Test Analysis - $(Split-Path $TestRoot -Leaf)</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -553,7 +546,7 @@ if ($GenerateHTML) {
 <body>
     <h1>RJAutoMover Test Analysis Report</h1>
     <div class="summary">
-        <div class="summary-stat"><strong>Version:</strong> $version</div>
+        <div class="summary-stat"><strong>Test Run:</strong> $(Split-Path $TestRoot -Leaf)</div>
         <div class="summary-stat"><strong>Generated:</strong> $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")</div>
         <div class="summary-stat"><strong>Total Files:</strong> $($stats.TotalFiles)</div>
         <div class="summary-stat"><strong>Matches:</strong> $($stats.Matches)</div>
@@ -648,7 +641,7 @@ if ($GenerateHTML) {
 </html>
 "@
 
-    $htmlReportPath = Join-Path $versionedFolder "analysis-results.html"
+    $htmlReportPath = Join-Path $ResultsFolder "analysis-results.html"
     Set-Content -Path $htmlReportPath -Value $htmlReport -Encoding UTF8
     Write-Success "HTML report saved: $htmlReportPath"
 }
@@ -659,7 +652,8 @@ if ($GenerateHTML) {
 
 Write-Section "Summary"
 Write-Success "Step 5 Complete"
-Write-Info "Results folder: $versionedFolder"
+Write-Info "Test Root: $TestRoot"
+Write-Info "Results folder: $ResultsFolder"
 Write-Info "Success rate: $([Math]::Round(($stats.Matches / $stats.TotalFiles) * 100, 1))%"
 Write-Info ""
 

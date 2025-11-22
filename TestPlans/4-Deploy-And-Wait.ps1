@@ -3,20 +3,18 @@
 # ================================================================================
 # This step is MANUAL - you must deploy the test config and run the service yourself
 # This script provides instructions and validation only
+# Saves backup to the versioned test folder created in Step 1
 #
 # Usage:
-#   .\4-Deploy-And-Wait.ps1
+#   .\4-Deploy-And-Wait.ps1 -TestRoot "C:\RJAutoMoverTest\testdata-0.9.6.108-20251122153045"
 #
-# Output:
-#   - Instructions for manual deployment
-#   - Validation of prerequisites
-#   - Reminders for next step
+# Output (in TestRoot):
+#   - config-backup.yaml (backup of production config)
 # ================================================================================
 
 param(
-    [string]$TestConfig = "test-config.yaml",
-    [string]$ProductionConfigPath = "C:\Program Files\RJAutoMover\config.yaml",
-    [string]$BackupConfigPath = "config-backup.yaml"
+    [Parameter(Mandatory=$true)]
+    [string]$TestRoot
 )
 
 # Color output functions
@@ -32,8 +30,22 @@ function Write-Section { param([string]$Title)
 }
 
 Write-Section "Step 4: Manual Deployment (Human Interaction Required)"
+
+# Validate TestRoot
+if (-not (Test-Path $TestRoot)) {
+    Write-Warning "Test root folder not found: $TestRoot"
+    Write-Info "Run 1-Generate-TestFiles.ps1 first to create the test folder"
+    exit 1
+}
+
+$TestConfig = Join-Path $TestRoot "test-config.yaml"
+$BackupConfigPath = Join-Path $TestRoot "config-backup.yaml"
+$ProductionConfigPath = "C:\Program Files\RJAutoMover\config.yaml"
+
+Write-Info "Test Root: $TestRoot"
 Write-Info "Test Config: $TestConfig"
 Write-Info "Production Path: $ProductionConfigPath"
+Write-Info "Backup Path: $BackupConfigPath"
 Write-Info ""
 
 # ====================================================================================
@@ -45,7 +57,7 @@ Write-Section "Pre-Flight Checks"
 # Check if test config exists
 if (-not (Test-Path $TestConfig)) {
     Write-Error "Test config not found: $TestConfig"
-    Write-Info "Run 2-Generate-TestConfig.ps1 first"
+    Write-Info "Run 2-Generate-TestConfig.ps1 and 3-Generate-Predictions.ps1 first"
     exit 1
 }
 Write-Success "Test config found: $TestConfig"
@@ -67,26 +79,35 @@ Write-Section "Manual Deployment Instructions"
 
 Write-Info "You must complete the following steps manually:"
 Write-Info ""
-Write-Info "1. BACKUP your current production config:"
+Write-Info "1. BACKUP your current production config (if it exists):"
 Write-Host "   Copy-Item '$ProductionConfigPath' '$BackupConfigPath' -Force" -ForegroundColor White
 Write-Info ""
-Write-Info "2. DEPLOY the test config:"
+Write-Info "2. COPY the test config to production location:"
 Write-Host "   Copy-Item '$TestConfig' '$ProductionConfigPath' -Force" -ForegroundColor White
 Write-Info ""
-Write-Info "3. RESTART the RJAutoMoverService:"
-Write-Host "   Restart-Service -Name 'RJAutoMoverService' -Force" -ForegroundColor White
-Write-Info "   OR use services.msc (Win+R -> services.msc)"
+Write-Info "3. START the RJAutoMoverService executable:"
+Write-Info "   - Navigate to: C:\Program Files\RJAutoMover"
+Write-Info "   - Run as Administrator: RJAutoMoverService.exe"
+Write-Info "   OR start via services.msc (Win+R -> services.msc)"
 Write-Info ""
-Write-Info "4. VERIFY service is running:"
+Write-Info "4. START the RJAutoMoverTray executable (optional but recommended):"
+Write-Info "   - Navigate to: C:\Program Files\RJAutoMover"
+Write-Info "   - Run: RJAutoMoverTray.exe"
+Write-Info "   - Tray icon provides real-time monitoring"
+Write-Info ""
+Write-Info "5. VERIFY service is running:"
 Write-Host "   Get-Service -Name 'RJAutoMoverService'" -ForegroundColor White
+Write-Info "   OR check tray icon status"
 Write-Info ""
-Write-Info "5. MONITOR the service logs:"
+Write-Info "6. MONITOR the service logs:"
 Write-Host "   Get-Content 'C:\ProgramData\RJAutoMover\Logs\*RJAutoMoverService*.log' -Wait" -ForegroundColor White
+Write-Info "   OR view logs in tray application (Logs tab)"
 Write-Info ""
-Write-Info "6. WAIT for the service to process all test files"
+Write-Info "7. WAIT for the service to process all test files:"
 Write-Info "   - Watch the logs for file move operations"
 Write-Info "   - Allow at least 2-3 minutes for all scan cycles to complete"
 Write-Info "   - Recommended: Wait 5-10 minutes for thorough processing"
+Write-Info "   - Service should stop actively moving files"
 Write-Info ""
 
 # ====================================================================================
@@ -96,9 +117,10 @@ Write-Info ""
 Write-Section "Ready to Continue?"
 
 Write-Warning "Before proceeding to Step 5 (Analysis), ensure:"
-Write-Info "  [x] Test config deployed to production location"
-Write-Info "  [x] RJAutoMoverService restarted successfully"
-Write-Info "  [x] Service has processed files (check logs)"
+Write-Info "  [x] Test config copied to: $ProductionConfigPath"
+Write-Info "  [x] RJAutoMoverService.exe started and running"
+Write-Info "  [x] RJAutoMoverTray.exe started (optional)"
+Write-Info "  [x] Service has processed files (check logs or tray)"
 Write-Info "  [x] Service is no longer actively moving files"
 Write-Info ""
 
@@ -160,11 +182,15 @@ Write-Section "Next Steps"
 
 Write-Success "Step 4 Complete (Manual Deployment)"
 Write-Info ""
+Write-Info "Test Root: $TestRoot"
+Write-Info ""
 Write-Info "Next: Run Step 5 to analyze results"
-Write-Host "   .\5-Analyze-Results.ps1 -GenerateHTML" -ForegroundColor White
+Write-Host "   .\5-Analyze-Results.ps1 -TestRoot '$TestRoot' -GenerateHTML" -ForegroundColor White
 Write-Info ""
 Write-Warning "IMPORTANT: After testing, restore your production config:"
-Write-Host "   Stop-Service -Name 'RJAutoMoverService'" -ForegroundColor White
-Write-Host "   Copy-Item '$BackupConfigPath' '$ProductionConfigPath' -Force" -ForegroundColor White
-Write-Host "   Start-Service -Name 'RJAutoMoverService'" -ForegroundColor White
+Write-Info "   1. Stop RJAutoMoverService.exe (close or stop via services.msc)"
+Write-Info "   2. Stop RJAutoMoverTray.exe (close from system tray)"
+Write-Host "   3. Copy-Item '$BackupConfigPath' '$ProductionConfigPath' -Force" -ForegroundColor White
+Write-Info "   4. Restart RJAutoMoverService.exe"
+Write-Info "   5. Restart RJAutoMoverTray.exe"
 Write-Info ""
