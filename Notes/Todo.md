@@ -46,7 +46,7 @@
 
 ## Ongoing / Maintenance
 
-- [ ] Please clean any unused code and functions (classes, comments, variables etc.).  Also, please ensure readmes, mds and comments are up to date and match the codes current functionality and usage.
+- [ ] Please clean any unused code and functions (classes, comments, variables etc.).  Also, please ensure readmes, mds and comments are up to date and match the codes current functionality and usage.  Also check all tooltips in the configurator match the documenation and design.
 
 
 ## Notes

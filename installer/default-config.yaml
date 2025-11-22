@@ -19,8 +19,8 @@
 #   - Name: Friendly name for the rule (1-32 alphanumeric characters)
 #   - SourceFolder: Folder to monitor (must exist, service must have read access)
 #   - Extension: File extensions to match (e.g., .pdf or .doc|.docx|.pdf)
-#       Special: Use "ALL" to match ANY file type (catch-all rule)
-#       Note: ALL rules MUST have a date criteria and only one per source folder
+#       Special: Use "OTHERS" to match ANY file type (catch-all rule)
+#       Note: OTHERS rules MUST have a DateFilter and only one per source folder
 #   - DestinationFolder: Where to move files (must exist, service must have write access)
 #   - ScanIntervalMs: How often to scan in milliseconds (5000-900000, recommended: 30000)
 #   - IsActive: Enable/disable this rule (true or false)

@@ -1,0 +1,208 @@
+# ================================================================================
+# RJAutoMover Test Configuration
+# ================================================================================
+# This configuration is designed for comprehensive testing of all file processing
+# rules, date filtering, and edge cases.
+#
+# IMPORTANT: Copy this file to C:\Program Files\RJAutoMover\config.yaml to test
+# ================================================================================
+
+FileRules:
+  # ==============================================================================
+  # Test Rule 1: Recent Files (Last Modified within 60 minutes)
+  # Tests: LM:- (within last) filtering
+  # ==============================================================================
+  - Name: "Test Recent Files"
+    SourceFolder: "C:\\RJAutoMover_TestData\\Source"
+    DestinationFolder: "C:\\RJAutoMover_TestData\\Destination\\Recent"
+    Extension: ".txt|.log"
+    ScanIntervalMs: 30000
+    FileExists: skip
+    IsActive: true
+    DateFilter: "LM:-60"
+
+  # ==============================================================================
+  # Test Rule 2: Old Documents (Created more than 7 days ago)
+  # Tests: FC:+ (older than) filtering, multiple extensions
+  # ==============================================================================
+  - Name: "Test Old Documents"
+    SourceFolder: "C:\\RJAutoMover_TestData\\Source"
+    DestinationFolder: "C:\\RJAutoMover_TestData\\Destination\\Old7Days"
+    Extension: ".doc|.docx|.pdf|.rtf"
+    ScanIntervalMs: 45000
+    FileExists: skip
+    IsActive: true
+    DateFilter: "FC:+10080"
+
+  # ==============================================================================
+  # Test Rule 3: Old Archives (Created more than 30 days ago)
+  # Tests: FC:+ filtering with large time period
+  # ==============================================================================
+  - Name: "Test Old Archives"
+    SourceFolder: "C:\\RJAutoMover_TestData\\Source"
+    DestinationFolder: "C:\\RJAutoMover_TestData\\Destination\\Old30Days"
+    Extension: ".zip|.rar|.7z|.tar|.gz"
+    ScanIntervalMs: 60000
+    FileExists: skip
+    IsActive: true
+    DateFilter: "FC:+43200"
+
+  # ==============================================================================
+  # Test Rule 4: Not Accessed in 90 Days
+  # Tests: LA:+ (older than) filtering - access time
+  # WARNING: Windows may disable access time updates - check fsutil behavior
+  # ==============================================================================
+  - Name: "Test Not Accessed 90 Days"
+    SourceFolder: "C:\\RJAutoMover_TestData\\Source"
+    DestinationFolder: "C:\\RJAutoMover_TestData\\Destination\\Old90Days"
+    Extension: ".bak|.tmp|.old"
+    ScanIntervalMs: 60000
+    FileExists: skip
+    IsActive: true
+    DateFilter: "LA:+129600"
+
+  # ==============================================================================
+  # Test Rule 5: Recent Videos (Modified within last 2 hours)
+  # Tests: LM:- (within last) with short time period
+  # ==============================================================================
+  - Name: "Test Recent Videos"
+    SourceFolder: "C:\\RJAutoMover_TestData\\Source"
+    DestinationFolder: "C:\\RJAutoMover_TestData\\Destination\\Videos"
+    Extension: ".mp4|.avi|.mkv|.mov"
+    ScanIntervalMs: 30000
+    FileExists: overwrite
+    IsActive: true
+    DateFilter: "LM:-120"
+
+  # ==============================================================================
+  # Test Rule 6: Recent Images (Created within last 24 hours)
+  # Tests: FC:- (within last) filtering, overwrite policy
+  # ==============================================================================
+  - Name: "Test Recent Images"
+    SourceFolder: "C:\\RJAutoMover_TestData\\Source"
+    DestinationFolder: "C:\\RJAutoMover_TestData\\Destination\\Images"
+    Extension: ".jpg|.jpeg|.png|.gif|.bmp"
+    ScanIntervalMs: 30000
+    FileExists: overwrite
+    IsActive: true
+    DateFilter: "FC:-1440"
+
+  # ==============================================================================
+  # Test Rule 7: Spreadsheets (No date filter)
+  # Tests: Processing without date filter
+  # ==============================================================================
+  - Name: "Test All Spreadsheets"
+    SourceFolder: "C:\\RJAutoMover_TestData\\Source"
+    DestinationFolder: "C:\\RJAutoMover_TestData\\Destination\\Documents"
+    Extension: ".xls|.xlsx|.csv"
+    ScanIntervalMs: 45000
+    FileExists: skip
+    IsActive: true
+    DateFilter: ""
+
+  # ==============================================================================
+  # Test Rule 8: Code Files (Modified within last 6 hours)
+  # Tests: LM:- filtering with medium time period
+  # ==============================================================================
+  - Name: "Test Recent Code"
+    SourceFolder: "C:\\RJAutoMover_TestData\\Source"
+    DestinationFolder: "C:\\RJAutoMover_TestData\\Destination\\Code"
+    Extension: ".cs|.js|.py|.java|.cpp"
+    ScanIntervalMs: 30000
+    FileExists: skip
+    IsActive: true
+    DateFilter: "LM:-360"
+
+  # ==============================================================================
+  # Test Rule 9: Web Files (Created more than 3 days ago)
+  # Tests: FC:+ with medium time period
+  # ==============================================================================
+  - Name: "Test Old Web Files"
+    SourceFolder: "C:\\RJAutoMover_TestData\\Source"
+    DestinationFolder: "C:\\RJAutoMover_TestData\\Destination\\Archives"
+    Extension: ".html|.htm|.css|.json|.xml"
+    ScanIntervalMs: 60000
+    FileExists: skip
+    IsActive: true
+    DateFilter: "FC:+4320"
+
+  # ==============================================================================
+  # Test Rule 10: OTHERS Extension (Catch-all for old files)
+  # Tests: OTHERS extension with mandatory DateFilter
+  # WARNING: OTHERS rules MUST have a DateFilter - validation will fail otherwise
+  # Processes LAST (after all specific extension rules)
+  # ==============================================================================
+  - Name: "Test OTHERS Catch-All"
+    SourceFolder: "C:\\RJAutoMover_TestData\\Source"
+    DestinationFolder: "C:\\RJAutoMover_TestData\\Destination\\Others"
+    Extension: OTHERS
+    ScanIntervalMs: 90000
+    FileExists: skip
+    IsActive: true
+    DateFilter: "FC:+20160"  # Files created more than 14 days ago
+
+# ==============================================================================
+# Application Configuration
+# ==============================================================================
+Application:
+  ProcessingPaused: false
+  RequireTrayApproval: false
+  RetryDelayMs: 5000
+  FailureCooldownMs: 180000
+  RecheckServiceMs: 30000
+  RecheckTrayMs: 30000
+  PauseDelayMs: 500
+  ServiceHeartbeatMs: 300000
+  MemoryLimitMb: 512
+  MemoryCheckMs: 60000
+  LogFolder: "C:\\ProgramData\\RJAutoMover\\Logs"
+  LogRetentionDays: 7
+  ServiceGrpcPort: 60051
+  TrayGrpcPort: 60052
+  ActivityHistoryEnabled: true
+  ActivityHistoryMaxRecords: 5000
+  ActivityHistoryRetentionDays: 90
+
+# ==============================================================================
+# Testing Notes
+# ==============================================================================
+#
+# Pre-Testing Checklist:
+# ✓ All extensions start with a dot (.)
+# ✓ DateFilter format matches TYPE:SIGN:MINUTES
+# ✓ OTHERS rule has DateFilter specified
+# ✓ No duplicate extensions in same source folder
+# ✓ ScanIntervalMs between 5000-900000
+# ✓ FileExists is either "skip" or "overwrite"
+#
+# DateFilter Examples Used:
+# - LM:-60    = Files modified within last 60 minutes (RECENT)
+# - FC:+10080 = Files created more than 7 days ago (OLD)
+# - FC:+43200 = Files created more than 30 days ago (OLD)
+# - LA:+129600 = Files NOT accessed in last 90 days (OLD)
+# - LM:-120   = Files modified within last 2 hours (RECENT)
+# - FC:-1440  = Files created within last 1 day (RECENT)
+# - LM:-360   = Files modified within last 6 hours (RECENT)
+# - FC:+4320  = Files created more than 3 days ago (OLD)
+# - FC:+20160 = Files created more than 14 days ago (OLD - for OTHERS rule)
+#
+# Time Conversions:
+# - 60 min = 1 hour
+# - 120 min = 2 hours
+# - 360 min = 6 hours
+# - 1440 min = 1 day
+# - 4320 min = 3 days
+# - 10080 min = 7 days
+# - 20160 min = 14 days
+# - 43200 min = 30 days
+# - 129600 min = 90 days
+#
+# Expected Behavior:
+# 1. Rules with specific extensions process FIRST
+# 2. OTHERS rule processes LAST (catches files not matched by other rules)
+# 3. If multiple rules target same source, first to grab file processes it
+# 4. Random 0-10 second delay added to each timer execution
+# 5. Files matching extension but not date filter are skipped
+# 6. Skipped files (FileExists=skip) are tracked and only logged once
+#
+# ==============================================================================

@@ -1,5 +1,5 @@
 ================================================================================
-                          RJAutoMover v0.9.6.105
+                          RJAutoMover v0.9.6.107
         Automated File Processing and Movement Service with Tray Monitor
 ================================================================================
 
@@ -216,7 +216,7 @@ Extension (Required)
          - NO wildcards allowed
   Special: ALL - Matches ANY file type (catch-all rule)
          - ALL rules MUST have a date criteria
-         - Only ONE ALL rule allowed per source folder
+         - Only ONE OTHERS rule allowed per source folder
          - Processes LAST (lowest priority - after specific extensions)
   Example: .pdf
            .doc|.docx
@@ -246,50 +246,37 @@ FileExists (Required)
   WARNING: "overwrite" permanently deletes the existing file!
   Tip: Use "skip" unless you're sure you want to overwrite
 
-LastAccessedMins (Optional)
-  What:  Filter files by last access time
-  Range: -5256000 to +5256000 (+/- 10 years, zero NOT allowed)
-  Values:
-    POSITIVE = Files OLDER than X minutes (accessed MORE than X minutes ago)
-    NEGATIVE = Files WITHIN last X minutes (accessed LESS than |X| minutes ago)
-  Examples:
-    1440  = Only files accessed MORE than 24 hours ago (older than)
-    -60   = Only files accessed WITHIN the last 60 minutes (recent)
-  Important: Only ONE date criteria can be used per rule
-            (mutually exclusive with LastModifiedMins and AgeCreatedMins)
-  Use Cases:
-    Positive: Archive files not accessed in a long time
-    Negative: Process only recently accessed files
+DateFilter (Optional)
+  What:  Filter files by date/time criteria (Last Accessed, Last Modified, or File Created)
+  Format: "TYPE:SIGN:MINUTES"
+    TYPE  = LA (Last Accessed), LM (Last Modified), FC (File Created)
+    SIGN  = + (older than), - (within last)
+    MINUTES = 1-5256000 (up to 10 years)
 
-LastModifiedMins (Optional)
-  What:  Filter files by last modification time
-  Range: -5256000 to +5256000 (+/- 10 years, zero NOT allowed)
-  Values:
-    POSITIVE = Files OLDER than X minutes (modified MORE than X minutes ago)
-    NEGATIVE = Files WITHIN last X minutes (modified LESS than |X| minutes ago)
   Examples:
-    60    = Only files modified MORE than 60 minutes ago (older than)
-    -30   = Only files modified WITHIN the last 30 minutes (recent)
-  Important: Only ONE date criteria can be used per rule
-            (mutually exclusive with LastAccessedMins and AgeCreatedMins)
-  Use Cases:
-    Positive: Archive files not changed in a long time
-    Negative: Process only recently modified files
+    "LA:+1440"  = Files NOT accessed in last 24 hours (older files)
+    "LA:-60"    = Files accessed within last 60 minutes (recent files)
+    "LM:+60"    = Files NOT modified in last 60 minutes (older files)
+    "LM:-30"    = Files modified within last 30 minutes (recent files)
+    "FC:+10080" = Files created more than 7 days ago (older files)
+    "FC:-1440"  = Files created within last 24 hours (recent files)
+    ""          = No date filter (process all matching files)
 
-AgeCreatedMins (Optional)
-  What:  Filter files by creation time
-  Range: -5256000 to +5256000 (+/- 10 years, zero NOT allowed)
-  Values:
-    POSITIVE = Files OLDER than X minutes (created MORE than X minutes ago)
-    NEGATIVE = Files WITHIN last X minutes (created LESS than |X| minutes ago)
-  Examples:
-    10080 = Only files created MORE than 7 days ago (older than)
-    -1440 = Only files created WITHIN the last 24 hours (recent)
-  Important: Only ONE date criteria can be used per rule
-            (mutually exclusive with LastAccessedMins and LastModifiedMins)
   Use Cases:
-    Positive: Archive old files based on creation date
-    Negative: Process only newly created files
+    LA:+ (older than)  = Archive files not accessed in a long time
+    LA:- (within last) = Process only recently accessed files
+    LM:+ (older than)  = Archive files not changed in a long time
+    LM:- (within last) = Process only recently modified files
+    FC:+ (older than)  = Archive old files based on creation date
+    FC:- (within last) = Process only newly created files
+
+  Important Notes:
+    - Only ONE date filter per rule (cannot combine LA, LM, and FC)
+    - OTHERS extension rules MUST have a DateFilter (required)
+    - Date filters are optional for specific extension rules
+    - "+" sign means "older than" (files NOT matching recent criteria)
+    - "-" sign means "within last" (recent files only)
+    - Windows may disable Last Access tracking - check with: fsutil behavior query disablelastaccess
 
 
 IMPORTANT RULE NOTES:
@@ -591,7 +578,7 @@ FileRules:
 ARCHIVING OLD FILES:
 --------------------
 Problem: Need to automatically archive files older than a certain age
-Solution: Use POSITIVE AgeCreatedMins (files created MORE than X minutes ago)
+Solution: Use DateFilter with FC:+ (files created MORE than X minutes ago)
 
 FileRules:
   - Name: Archive Old Logs
@@ -601,7 +588,7 @@ FileRules:
     ScanIntervalMs: 86400000
     IsActive: true
     FileExists: skip
-    AgeCreatedMins: 10080  # POSITIVE = older than 7 days (7 * 24 * 60)
+    DateFilter: "FC:+10080"  # Older than 7 days (7 * 24 * 60)
 
   - Name: Archive Old Screenshots
     SourceFolder: C:\Users\Me\Pictures\Screenshots
@@ -610,13 +597,13 @@ FileRules:
     ScanIntervalMs: 3600000
     IsActive: true
     FileExists: skip
-    AgeCreatedMins: 43200  # POSITIVE = older than 30 days (30 * 24 * 60)
+    DateFilter: "FC:+43200"  # Older than 30 days (30 * 24 * 60)
 
 
 PROCESSING RECENT FILES ONLY:
 ------------------------------
 Problem: Only want to process files modified in the last hour
-Solution: Use NEGATIVE LastModifiedMins (files modified WITHIN last X minutes)
+Solution: Use DateFilter with LM:- (files modified WITHIN last X minutes)
 
 FileRules:
   - Name: Recent Reports
@@ -626,13 +613,13 @@ FileRules:
     ScanIntervalMs: 60000
     IsActive: true
     FileExists: overwrite
-    LastModifiedMins: -60  # NEGATIVE = within last 60 minutes (recent only)
+    DateFilter: "LM:-60"  # Within last 60 minutes (recent only)
 
 
-CATCH-ALL RULES WITH EXTENSION: ALL
+CATCH-ALL RULES WITH EXTENSION: OTHERS
 ------------------------------------
 Problem: Want to move ANY old file from Downloads, not just specific types
-Solution: Use Extension: ALL with a date criteria (lowest priority)
+Solution: Use Extension: OTHERS with a DateFilter (lowest priority)
 
 FileRules:
   # Specific rules process FIRST
@@ -652,10 +639,10 @@ FileRules:
     IsActive: true
     FileExists: skip
 
-  # ALL rule processes LAST (catch-all for everything else)
+  # OTHERS rule processes LAST (catch-all for everything else)
   - Name: Archive Old Downloads
     SourceFolder: C:\Users\Me\Downloads
-    Extension: ALL
+    Extension: OTHERS
     DestinationFolder: C:\Users\Me\Downloads\Archive
     ScanIntervalMs: 3600000
     IsActive: true
@@ -663,9 +650,9 @@ FileRules:
     AgeCreatedMins: 43200  # POSITIVE = older than 30 days (move old files)
 
 Important Notes:
-  - ALL rules MUST have a date criteria (LastAccessedMins, LastModifiedMins, or AgeCreatedMins)
-  - Only ONE ALL rule allowed per source folder
-  - ALL rules process LAST (lowest priority - after specific extension rules)
+  - OTHERS rules MUST have a DateFilter
+  - Only ONE OTHERS rule allowed per source folder
+  - OTHERS rules process LAST (lowest priority - after specific extension rules)
   - Date criteria can be positive (older than) or negative (within last)
   - In the example above:
     * Videos and documents are moved to specific folders immediately
@@ -928,7 +915,7 @@ Disclaimer:
 VERSION INFORMATION
 ================================================================================
 
-Version: 0.9.6.105
+Version: 0.9.6.107
 Release Date: October 2025
 Built with: .NET 10.0
 Platform: Windows 10/11, Windows Server 2016+

@@ -523,6 +523,24 @@ public class ConfigValidator
                 var extensions = rule.GetExtensions();
                 foreach (var ext in extensions)
                 {
+                    // Check if extension starts with a dot
+                    if (!ext.StartsWith("."))
+                    {
+                        if (isActiveRule)
+                        {
+                            return new ValidationResult
+                            {
+                                IsValid = false,
+                                ErrorMessage = $"Extension '{ext}' must begin with a dot (.) in rule '{rule.Name}'. Example: '.txt' not 'txt'"
+                            };
+                        }
+                        else
+                        {
+                            inactiveRuleIssues.Add($"Rule '{rule.Name}': Extension '{ext}' must begin with a dot (.)");
+                        }
+                    }
+
+                    // Check full extension format (dot + 1-10 alphanumeric characters)
                     if (!Regex.IsMatch(ext, @"^\.[a-zA-Z0-9]{1,10}$"))
                     {
                         if (isActiveRule)
@@ -530,12 +548,12 @@ public class ConfigValidator
                             return new ValidationResult
                             {
                                 IsValid = false,
-                                ErrorMessage = $"Invalid extension format '{ext}' in rule '{rule.Name}'"
+                                ErrorMessage = $"Invalid extension format '{ext}' in rule '{rule.Name}'. Must be: dot (.) followed by 1-10 alphanumeric characters"
                             };
                         }
                         else
                         {
-                            inactiveRuleIssues.Add($"Rule '{rule.Name}': Invalid extension format '{ext}'");
+                            inactiveRuleIssues.Add($"Rule '{rule.Name}': Invalid extension format '{ext}' (must be dot + 1-10 alphanumeric)");
                         }
                     }
 

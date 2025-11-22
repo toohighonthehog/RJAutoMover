@@ -32,6 +32,8 @@ public class FileProcessorService
     private GrpcServerServiceSimplified? _grpcServer;
     private ServiceGrpcClientServiceV2? _serviceClient;
     private ActivityHistoryService? _activityHistoryService;
+    private DateTime _lastSkippedFilesWarning = DateTime.MinValue;
+    private const int SkippedFilesWarningThreshold = 2048;
     public event EventHandler<StatusUpdateEventArgs>? StatusUpdated;
     public event EventHandler<IconUpdateEventArgs>? IconUpdated;
     public event EventHandler<RecentsUpdateEventArgs>? RecentsUpdated;
@@ -474,9 +476,10 @@ public class FileProcessorService
                 }
                 else
                 {
-                    // Regular rule: filter by specific extensions
+                    // Regular rule: filter by specific extensions (case-insensitive match, preserves original case)
                     files = Directory.GetFiles(rule.SourceFolder)
-                        .Where(f => extensions.Any(ext => f.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
+                        .Where(f => extensions.Any(ext =>
+                            Path.GetExtension(f).Equals(ext, StringComparison.OrdinalIgnoreCase)))
                         .Where(f => IsFileProcessable(f))
                         .Where(f => MatchesDateCriteria(f, rule))
                         .ToList();
@@ -597,6 +600,10 @@ public class FileProcessorService
                                 };
 
                                 _logger.Log(LogLevel.DEBUG, $"Skipping existing file (will track changes): {fileName}");
+
+                                // Monitor skipped files dictionary size and issue hourly warnings if threshold exceeded
+                                CheckSkippedFilesThreshold();
+
                                 // Don't add skipped files to recent files list
                                 transferSuccess = true;
                                 break;
@@ -1192,6 +1199,40 @@ public class FileProcessorService
             var errorMsg = $"Configuration file changed externally. Error during re-validation: {ex.Message}";
             _logger.Log(LogLevel.ERROR, errorMsg);
             return errorMsg;
+        }
+    }
+
+    /// <summary>
+    /// Monitors the skipped files dictionary and logs hourly warnings if threshold is exceeded
+    /// </summary>
+    private void CheckSkippedFilesThreshold()
+    {
+        var currentCount = _skippedFiles.Count;
+
+        if (currentCount > SkippedFilesWarningThreshold)
+        {
+            var now = DateTime.Now;
+            var hoursSinceLastWarning = (now - _lastSkippedFilesWarning).TotalHours;
+
+            // Log warning once per hour
+            if (hoursSinceLastWarning >= 1.0)
+            {
+                _logger.Log(LogLevel.WARN, $"============================================");
+                _logger.Log(LogLevel.WARN, $"SKIPPED FILES THRESHOLD EXCEEDED");
+                _logger.Log(LogLevel.WARN, $"============================================");
+                _logger.Log(LogLevel.WARN, $"Current count: {currentCount} files");
+                _logger.Log(LogLevel.WARN, $"Threshold: {SkippedFilesWarningThreshold} files");
+                _logger.Log(LogLevel.WARN, $"Memory impact: Tracking data for {currentCount} skipped files");
+                _logger.Log(LogLevel.WARN, $"");
+                _logger.Log(LogLevel.WARN, $"Files are being skipped due to FileExists policy.");
+                _logger.Log(LogLevel.WARN, $"Consider:");
+                _logger.Log(LogLevel.WARN, $"  - Changing FileExists policy from 'skip' to 'overwrite'");
+                _logger.Log(LogLevel.WARN, $"  - Cleaning up destination folders");
+                _logger.Log(LogLevel.WARN, $"  - Restarting the service to clear tracking data");
+                _logger.Log(LogLevel.WARN, $"============================================");
+
+                _lastSkippedFilesWarning = now;
+            }
         }
     }
 }

@@ -86,12 +86,15 @@
                 <TextBlock Text="File Extensions" Style="{StaticResource LabelStyle}"/>
                 <TextBox x:Name="ExtensionTextBox" Style="{StaticResource TextBoxStyle}"
                          Text="{Binding Extension, UpdateSourceTrigger=PropertyChanged}"
-                         TextChanged="ExtensionTextBox_TextChanged"/>
+                         TextChanged="ExtensionTextBox_TextChanged"
+                         ToolTip="Extensions MUST begin with a dot (.) and contain 1-10 alphanumeric characters.&#x0a;Case-insensitive: rule '.txt' matches '.TXT' files (preserves original case when moving).&#x0a;Files matching a specific extension rule are processed first, then OTHERS rules process remaining files."/>
                 <TextBlock x:Name="ExtensionError" FontSize="10" Foreground="Red" Margin="0,2,0,0" Visibility="Collapsed"/>
                 <TextBlock FontSize="10" Foreground="#999" Margin="0,2,0,5" TextWrapping="Wrap">
                     <Run Text="Use | to separate multiple extensions (e.g., .pdf|.doc|.txt)"/>
                     <LineBreak/>
                     <Run Text="Use 'OTHERS' to match any file type (requires date filter)"/>
+                    <LineBreak/>
+                    <Run Text="⚠️ All extensions MUST begin with a dot (e.g., '.txt' not 'txt')"/>
                 </TextBlock>
 
                 <!-- Scan Interval -->
@@ -120,14 +123,21 @@
 
                 <!-- File Exists Action -->
                 <TextBlock Text="Action if File Exists in Destination" Style="{StaticResource LabelStyle}"/>
-                <StackPanel Orientation="Horizontal" Margin="0,5,0,10">
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
                     <RadioButton x:Name="FileExistsSkipRadio" Content="Skip (leave existing file)"
                                  GroupName="FileExists" Margin="0,0,20,0"
-                                 Checked="FileExistsRadio_Checked"/>
+                                 Checked="FileExistsRadio_Checked"
+                                 ToolTip="Skips files that already exist in destination. Service tracks skipped files and only logs changes."/>
                     <RadioButton x:Name="FileExistsOverwriteRadio" Content="Overwrite (replace existing)"
                                  GroupName="FileExists"
-                                 Checked="FileExistsRadio_Checked"/>
+                                 Checked="FileExistsRadio_Checked"
+                                 ToolTip="Replaces existing files in destination with source file."/>
                 </StackPanel>
+                <TextBlock FontSize="10" Foreground="#999" Margin="0,2,0,10" TextWrapping="Wrap">
+                    <Run Text="ℹ️ If multiple rules target the same source folder, the first rule to process a file will move it."/>
+                    <LineBreak/>
+                    <Run Text="   Other rules will skip that file (already being processed). Rules process concurrently."/>
+                </TextBlock>
 
                 <!-- Date Filtering -->
                 <TextBlock Text="Date Filtering (Optional)" Style="{StaticResource SectionHeaderStyle}"/>
@@ -159,12 +169,14 @@
                             <!-- Last Accessed Filter -->
                             <RadioButton x:Name="LastAccessedRadio" Content="Last Accessed Time" GroupName="DateFilter"
                                          Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" FontWeight="Medium"
-                                         Margin="0,5" Checked="DateFilterRadio_Changed"/>
+                                         Margin="0,5" Checked="DateFilterRadio_Changed"
+                                         ToolTip="Filters based on when files were last opened/read. Note: Windows may disable access time updates for performance."/>
                             <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="1" Margin="10,5,0,5"
                                         IsEnabled="{Binding IsChecked, ElementName=LastAccessedRadio}">
                                 <TextBlock Text="Files" VerticalAlignment="Center" Margin="0,0,5,0"/>
                                 <ComboBox x:Name="LastAccessedDirection" Width="100" SelectedIndex="0"
-                                          SelectionChanged="DateFilterComboBox_SelectionChanged">
+                                          SelectionChanged="DateFilterComboBox_SelectionChanged"
+                                          ToolTip="'older than' = files NOT accessed in last X minutes (processes OLD files)&#x0a;'within last' = files accessed in last X minutes (processes RECENT files)">
                                     <ComboBoxItem Content="older than"/>
                                     <ComboBoxItem Content="within last"/>
                                 </ComboBox>
@@ -177,12 +189,14 @@
                             <!-- Last Modified Filter -->
                             <RadioButton x:Name="LastModifiedRadio" Content="Last Modified Time" GroupName="DateFilter"
                                          Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontWeight="Medium"
-                                         Margin="0,5" Checked="DateFilterRadio_Changed"/>
+                                         Margin="0,5" Checked="DateFilterRadio_Changed"
+                                         ToolTip="Filters based on when file content was last changed/written."/>
                             <StackPanel Orientation="Horizontal" Grid.Row="1" Grid.Column="1" Margin="10,5,0,5"
                                         IsEnabled="{Binding IsChecked, ElementName=LastModifiedRadio}">
                                 <TextBlock Text="Files" VerticalAlignment="Center" Margin="0,0,5,0"/>
                                 <ComboBox x:Name="LastModifiedDirection" Width="100" SelectedIndex="0"
-                                          SelectionChanged="DateFilterComboBox_SelectionChanged">
+                                          SelectionChanged="DateFilterComboBox_SelectionChanged"
+                                          ToolTip="'older than' = files NOT modified in last X minutes (processes OLD files)&#x0a;'within last' = files modified in last X minutes (processes RECENT files)">
                                     <ComboBoxItem Content="older than"/>
                                     <ComboBoxItem Content="within last"/>
                                 </ComboBox>
@@ -195,12 +209,14 @@
                             <!-- File Created Filter -->
                             <RadioButton x:Name="AgeCreatedRadio" Content="File Created Time" GroupName="DateFilter"
                                          Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" FontWeight="Medium"
-                                         Margin="0,5" Checked="DateFilterRadio_Changed"/>
+                                         Margin="0,5" Checked="DateFilterRadio_Changed"
+                                         ToolTip="Filters based on when file was originally created on disk."/>
                             <StackPanel Orientation="Horizontal" Grid.Row="2" Grid.Column="1" Margin="10,5,0,5"
                                         IsEnabled="{Binding IsChecked, ElementName=AgeCreatedRadio}">
                                 <TextBlock Text="Files" VerticalAlignment="Center" Margin="0,0,5,0"/>
                                 <ComboBox x:Name="AgeCreatedDirection" Width="100" SelectedIndex="0"
-                                          SelectionChanged="DateFilterComboBox_SelectionChanged">
+                                          SelectionChanged="DateFilterComboBox_SelectionChanged"
+                                          ToolTip="'older than' = files created more than X minutes ago (processes OLD files)&#x0a;'within last' = files created within last X minutes (processes RECENT files)">
                                     <ComboBoxItem Content="older than"/>
                                     <ComboBoxItem Content="within last"/>
                                 </ComboBox>
